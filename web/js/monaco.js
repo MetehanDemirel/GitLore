@@ -4,22 +4,26 @@ import { t } from "./i18n.js";
 
 let loading = null;
 
+const addScript = (src) => new Promise((resolve, reject) => {
+  const script = document.createElement("script");
+  script.src = src;
+  script.onload = resolve;
+  script.onerror = () => reject(new Error("editor files missing"));
+  document.head.appendChild(script);
+});
+
 /** Load Monaco once, with its menus in `lang` (tr, fr and de ship with Monaco). */
 export function loadMonaco(basePath, lang) {
   if (loading) return loading;
-  loading = new Promise((resolve, reject) => {
-    const script = document.createElement("script");
-    script.src = `${basePath}/loader.js`;
-    script.onerror = () => reject(new Error("editor files missing"));
-    script.onload = () => {
-      window.require.config({ paths: { vs: basePath }, "vs/nls": { availableLanguages: { "*": lang } } });
-      window.require(["vs/editor/editor.main"], () => {
-        defineThemes(window.monaco);
-        resolve(window.monaco);
-      }, reject);
-    };
-    document.head.appendChild(script);
-  });
+  loading = (async () => {
+    // Monaco's translations are plain scripts that set globals; they must run before the editor loads.
+    if (lang !== "en") await addScript(`${basePath}/nls/lang/${lang}.js`).catch(() => {});
+    await addScript(`${basePath}/loader.js`);
+    window.require.config({ paths: { vs: basePath } });
+    await new Promise((resolve, reject) => window.require(["vs/editor/editor.main"], resolve, reject));
+    defineThemes(window.monaco);
+    return window.monaco;
+  })();
   return loading;
 }
 

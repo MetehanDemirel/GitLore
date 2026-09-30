@@ -17,7 +17,7 @@ const paths = {
   file: "M4 2.5h5l3 3v8H4v-11ZM9 2.5v3h3",
   save: "M3.5 3h7l2 2v8h-9V3ZM5.5 3v3h4V3M5.5 13v-3.5h5V13",
   chat: "M3 4h10v6.5H7.5L5 12.5v-2H3V4Z",
-  repo: "M4 2.5h7.5v9H5a1 1 0 0 0-1 1v-10ZM4 12.5a1 1 0 0 0 1 1h6.5v-2",
+  repo: "M2.5 4.5a1 1 0 0 1 1-1h3l1.5 1.5h4.5a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1v-7.5Z",
   check: "M3.5 8.5 6.5 11.5 12.5 4.5",
   refresh: "M12.5 5.5A5 5 0 1 0 13 9M12.5 2.5v3h-3",
   sidebar: "M2.5 3h11v10h-11zM6 3v10",
