@@ -48,7 +48,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          python -m pytest -q -rfEs --tb=short 2>&1 | tee pytest.log
+          python -m pytest -q -rfEs --tb=short --ignore=tests/e2e 2>&1 | tee pytest.log
           status=${PIPESTATUS[0]}
           [ "$status" -eq 0 ] || python .github/annotate.py "Tests failed" pytest.log
           exit "$status"
@@ -68,7 +68,7 @@ jobs:
           - os: windows-latest
             uv: true
     env:
-      STREAMLIT_SERVER_HEADLESS: "true"
+      GITLORE_NO_BROWSER: "1"
       GITLORE_NO_AUTO_SHUTDOWN: "1"
     steps:
       - uses: actions/checkout@v4

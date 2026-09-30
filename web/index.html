@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#F4F6F5" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#15191A" media="(prefers-color-scheme: dark)">
+  <title>GitLore</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/styles.css">
+  <script>
+    // Apply the saved theme before first paint, so the page never flashes the wrong colors.
+    try {
+      const t = localStorage.getItem("gitlore.theme") || "system";
+      const dark = t === "dark" || (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+    } catch (e) {}
+  </script>
+</head>
+<body>
+  <div id="app" aria-busy="true"><p class="boot">Starting GitLore…</p></div>
+  <script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

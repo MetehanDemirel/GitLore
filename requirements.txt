@@ -1,10 +1,11 @@
-# GitLore dependencies — CPU-only, no compiler required.
+# GitLore dependencies — CPU-only.
 # Supported Python: 3.11 – 3.13 (3.12 recommended). Python 3.14 is NOT supported yet:
 # llama-cpp-python has no prebuilt wheels for it.
 #
 # Install:  uv pip install -r requirements.txt     (or: pip install -r requirements.txt)
+# Linux:    add  --no-binary llama-cpp-python  (see SETUP.md; the prebuilt Linux wheel is musl-only)
 
-# Prebuilt CPU wheels for llama-cpp-python (Windows / Linux / Apple Silicon).
+# Prebuilt CPU wheels for llama-cpp-python (Windows / macOS Apple Silicon).
 # PyPI only ships the source tarball, which needs a C++ compiler to install.
 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
 
@@ -13,13 +14,14 @@
 llama-cpp-python==0.3.19
 # <2.0 because chromadb -> tokenizers requires it; without the cap the resolver falls
 # back to an ancient tokenizers that needs a Rust compiler.
-huggingface-hub>=0.30,<2        # auto-downloads the GGUF model on first run
+huggingface-hub>=0.30,<2        # downloads the GGUF model on request
 
 # --- Retrieval (RAG) ---------------------------------------------------------
 # Chroma's built-in embedder (all-MiniLM-L6-v2 via onnxruntime) is used,
 # so sentence-transformers / PyTorch are intentionally NOT required.
 chromadb>=1.5,<2
 
-# --- Git + UI ----------------------------------------------------------------
+# --- Git + web server ---------------------------------------------------------
 GitPython>=3.1.43,<4            # requires the `git` CLI on PATH
-streamlit>=1.40,<2
+starlette>=0.46,<2              # small web framework for the API + static UI
+uvicorn>=0.30,<1                # web server

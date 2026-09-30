@@ -78,12 +78,14 @@ def commit_url_base(repo_path: str) -> str | None:
     return f"https://{m['host']}/{m['path']}{sep}"
 
 
-def get_commits(repo_path: str, max_count: int = config.DEFAULT_COMMIT_COUNT) -> list[Commit]:
-    """Return up to `max_count` commits reachable from HEAD, newest first."""
+def get_commits(repo_path: str, max_count: int = config.DEFAULT_COMMIT_COUNT, rev: str = "HEAD") -> list[Commit]:
+    """Return up to `max_count` commits reachable from `rev` (default HEAD), newest first."""
+    if not rev or rev.startswith("-"):
+        raise RepoError("Invalid revision.")  # never let a value be read as a git option
     repo = open_repo(repo_path)
     # c=... is a global git option (git -c core.quotepath=off log ...): keep non-ASCII names readable.
     proc = repo.git(c="core.quotepath=off").log(
-        "HEAD",
+        rev,
         f"--max-count={max(1, int(max_count))}",
         _LOG_FORMAT,
         "--patch",

@@ -1,2 +1,4 @@
 -r requirements.txt
 pytest>=8
+httpx2>=2.13           # Starlette's TestClient
+pytest-playwright>=0.5 # browser tests (then: python -m playwright install chromium)

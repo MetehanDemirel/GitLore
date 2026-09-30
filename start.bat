@@ -51,7 +51,7 @@ copy /y requirements.txt ".venv\requirements.stamp" >nul
 rem --- 3. Run ---
 :run
 echo [GitLore] Starting... a browser tab will open. Close it (or this window) to stop.
-"%VENV_PY%" -m streamlit run app.py %*
+"%VENV_PY%" gitlore.py %*
 exit /b %errorlevel%
 
 :fail

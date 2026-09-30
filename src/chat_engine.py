@@ -22,6 +22,10 @@ SYSTEM_PROMPT = (
 
 Turn = tuple[str, str]  # (question, answer)
 
+# Language names as the model understands them best (in English).
+ANSWER_LANGUAGES = {"en": "English", "tr": "Turkish", "fr": "French", "de": "German"}
+_FOCUS_MAX_CHARS = 1200          # selected code carried into the prompt
+
 _TEMPLATE_SLACK_TOKENS = 64      # chat-template markup around each message
 _HISTORY_ANSWER_TOKENS = 200     # how much of the previous answer to carry into a follow-up
 _FOLLOW_UP_MAX_WORDS = 5         # short questions ("and who did that?") inherit the previous question
@@ -58,11 +62,31 @@ def format_commit(c: Commit, include_diff: bool = True) -> str:
     return "\n".join(lines)
 
 
+def format_focus(focus: dict) -> str:
+    """The code the user selected (right-click → Ask GitLore), shown to the model before the question.
+
+    Small models don't connect "selected code" with "the commit that changed it" on their own, so the
+    link is stated explicitly: which commit added (right side) or removed (left side) the code.
+    """
+    path = focus.get("path") or "a file"
+    text = (focus.get("text") or "")[:_FOCUS_MAX_CHARS]
+    commit = (focus.get("commit") or "")[:7]
+    if commit:
+        verb = "removed" if focus.get("side") == "original" else "added"
+        intro = (f"The user selected this code from {path}. Commit [{commit}] {verb} it "
+                 f"(that commit is listed first above; use its message to explain why)")
+    else:
+        intro = f"The user selected this code from {path} (their current, uncommitted version)"
+    return f"\n\n{intro}:\n```\n{text}\n```"
+
+
 def build_messages(
-    llm: "Llama", question: str, commits: Sequence[Commit], history: Sequence[Turn] = ()
+    llm: "Llama", question: str, commits: Sequence[Commit], history: Sequence[Turn] = (),
+    language: str = "en", focus: dict | None = None,
 ) -> tuple[list[dict], list[Commit]]:
     """Pack as many commits (best first) as fit the context budget.
 
+    `language` is the answer language; `focus` is code the user selected (path, commit, text).
     Returns the chat messages and the commits actually included (for citations in the UI).
     """
 
@@ -72,13 +96,18 @@ def build_messages(
     system = SYSTEM_PROMPT
     if getattr(llm, "metadata", {}).get("general.architecture") == "qwen3":
         system += " /no_think"  # Qwen3's switch to skip its slow hidden reasoning step
+    if language != "en" and language in ANSWER_LANGUAGES:
+        system += f" Always answer in {ANSWER_LANGUAGES[language]}, even if the commits are in English."
     messages: list[dict] = [{"role": "system", "content": system}]
     if history:
         prev_q, prev_a = history[-1]
         prev_a = _truncate_to_tokens(llm, prev_a, _HISTORY_ANSWER_TOKENS)
         messages += [{"role": "user", "content": prev_q}, {"role": "assistant", "content": prev_a}]
 
-    question_block = f"\n\nQuestion: {question.strip()}"
+    focus_block = format_focus(focus) if focus and focus.get("text") else ""
+    # Small models follow the instruction closest to the end best, so the answer language is repeated here.
+    reminder = f"\n(Answer in {ANSWER_LANGUAGES[language]}.)" if language != "en" and language in ANSWER_LANGUAGES else ""
+    question_block = f"{focus_block}\n\nQuestion: {question.strip()}{reminder}"
     budget = (
         config.MAX_PROMPT_TOKENS
         - _TEMPLATE_SLACK_TOKENS * (len(messages) + 1)

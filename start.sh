@@ -49,4 +49,4 @@ fi
 
 # 3. Run
 echo "[GitLore] Starting... a browser tab will open."
-exec "$VENV_PY" -m streamlit run app.py "$@"
+exec "$VENV_PY" gitlore.py "$@"
