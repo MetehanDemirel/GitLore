@@ -57,6 +57,13 @@ DEFAULT_COMMIT_COUNT = 200
 MAX_COMMIT_COUNT = 2000
 MAX_DIFF_CHARS_PER_COMMIT = 1500   # truncation for both indexing and prompting
 MAX_FILES_LISTED = 30
+# Files whose diff content is noise for "why did this change?" questions.
+# They still appear in files_changed; only their line-by-line diff is skipped.
+NOISY_DIFF_FILES = (
+    "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "poetry.lock", "uv.lock",
+    "Cargo.lock", "Gemfile.lock", "composer.lock", "go.sum",
+)
+NOISY_DIFF_SUFFIXES = (".min.js", ".min.css", ".map", ".svg", ".ipynb")
 
 # --- Retrieval ---------------------------------------------------------------
 TOP_K = 5

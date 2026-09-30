@@ -96,7 +96,9 @@ GitLore/
 ## Implementation phases
 
 1. **Scaffold** ✅ — `config.py`, `.gitignore`, `.streamlit/config.toml`, `start.bat`/`start.sh`, module stubs with final signatures, `tests/test_config.py`, `requirements-dev.txt`. Verified: `start.bat` fresh install + relaunch on Windows.
-2. **Git parser** — `get_commits()` + tests against a throwaway repo created in `tmp_path`.
+2. **Git parser** ✅ — `get_commits()` via one streamed `git log -p -U0 --diff-merges=first-parent`; diffs truncated
+   while streaming; lock/generated files listed but diff skipped; friendly `RepoError`s. 15 tests on real temp repos.
+   Benchmark (psf/requests): 2,000 commits in 0.8 s, 5 MB peak memory.
 3. **Vector store** — `index_commits()` (incremental), `search()`; tests with an ephemeral client.
 4. **Model manager** — download with progress, load, presets; smoke test generates a few tokens.
 5. **Chat engine** — prompt assembly with token budget, streaming generator.
