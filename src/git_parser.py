@@ -43,20 +43,20 @@ def open_repo(repo_path: str) -> git.Repo:
     """Open a repository (a subfolder of one is fine), raising RepoError with a readable message."""
     path = Path(repo_path.strip().strip('"')).expanduser()
     if not path.exists():
-        raise RepoError(f"Folder not found: {path}")
+        raise RepoError(f"Folder not found: {path}. Check the path for typos and paste it again.")
     if not path.is_dir():
-        raise RepoError(f"Not a folder: {path}")
+        raise RepoError(f"Not a folder: {path}. Paste the repository folder itself, not a file inside it.")
     try:
         repo = git.Repo(path, search_parent_directories=True)
         repo.git.version()
     except git.InvalidGitRepositoryError:
-        raise RepoError(f"Not a Git repository: {path}") from None
+        raise RepoError(f"Not a Git repository: {path}. Choose the folder that contains the .git directory.") from None
     except git.GitCommandNotFound:
         raise RepoError("Git is not installed or not on PATH. Install it from https://git-scm.com") from None
     if repo.bare:
         raise RepoError("Bare repositories aren't supported; point GitLore at a normal checkout.")
     if not repo.head.is_valid():
-        raise RepoError("This repository has no commits yet.")
+        raise RepoError("This repository has no commits yet. Make a first commit, then index it again.")
     return repo
 
 

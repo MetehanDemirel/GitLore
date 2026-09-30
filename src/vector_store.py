@@ -14,6 +14,7 @@ from functools import lru_cache
 
 import chromadb
 from chromadb.config import Settings
+from chromadb.errors import NotFoundError
 from chromadb.utils.embedding_functions import DefaultEmbeddingFunction
 
 from src import config
@@ -112,10 +113,10 @@ def count(repo_path: str) -> int:
 
 def reset(repo_path: str) -> None:
     """Delete this repo's index (e.g. after a history rewrite)."""
-    client = _client(str(config.CHROMA_DIR))
-    name = collection_name(repo_path)
-    if name in {c.name for c in client.list_collections()}:
-        client.delete_collection(name)
+    try:
+        _client(str(config.CHROMA_DIR)).delete_collection(collection_name(repo_path))
+    except NotFoundError:
+        pass  # nothing indexed yet
 
 
 def search(repo_path: str, query: str, top_k: int = config.TOP_K) -> list[Commit]:

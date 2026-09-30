@@ -62,7 +62,6 @@ def default_n_threads_batch() -> int:
 
 # --- Git ingestion -----------------------------------------------------------
 DEFAULT_COMMIT_COUNT = 200
-MAX_COMMIT_COUNT = 2000
 MAX_DIFF_CHARS_PER_COMMIT = 1500   # truncation for both indexing and prompting
 MAX_FILES_LISTED = 30
 # Files whose diff content is noise for "why did this change?" questions.

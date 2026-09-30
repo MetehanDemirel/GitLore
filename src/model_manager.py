@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -53,7 +54,10 @@ def ensure_model(preset: ModelPreset, on_progress: ProgressCallback | None = Non
             tqdm_class=_progress_tqdm(on_progress) if on_progress else None,
         )
     except (RepositoryNotFoundError, EntryNotFoundError):
-        raise ModelError(f"'{preset.filename}' was not found in '{preset.repo_id}' on Hugging Face.") from None
+        raise ModelError(
+            f"'{preset.filename}' was not found in '{preset.repo_id}' on Hugging Face. "
+            "Check the repo and file name on the model's Hugging Face page."
+        ) from None
     except OSError as e:  # includes connection errors
         raise ModelError(f"Download failed — check your internet connection. ({e.__class__.__name__})") from None
     return Path(downloaded)
@@ -70,7 +74,7 @@ def load_llm(preset: ModelPreset) -> "Llama":
 
     path = model_path(preset)
     if not path.is_file():
-        raise ModelError("Model is not downloaded yet.")
+        raise ModelError("Model is not downloaded yet. Click Download Model in the side panel.")
     try:
         return Llama(
             model_path=str(path),
@@ -81,7 +85,7 @@ def load_llm(preset: ModelPreset) -> "Llama":
             verbose=False,
         )
     except ValueError as e:
-        raise ModelError(f"Could not load the model (is it a valid, supported GGUF file?): {e}") from None
+        raise ModelError(f"Could not load the model: {e}. Remove it and pick a preset, or a GGUF file llama.cpp supports.") from None
 
 
 def _progress_tqdm(on_progress: ProgressCallback):
@@ -91,7 +95,7 @@ def _progress_tqdm(on_progress: ProgressCallback):
     class _Progress(tqdm):
         def __init__(self, *args, **kwargs):
             kwargs["disable"] = False
-            kwargs.setdefault("file", _NullWriter())
+            kwargs.setdefault("file", io.StringIO())  # swallow the text bar
             super().__init__(*args, **kwargs)
 
         def update(self, n=1):
@@ -102,10 +106,3 @@ def _progress_tqdm(on_progress: ProgressCallback):
 
     return _Progress
 
-
-class _NullWriter:
-    def write(self, *_):
-        pass
-
-    def flush(self):
-        pass
