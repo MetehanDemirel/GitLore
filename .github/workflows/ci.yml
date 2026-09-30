@@ -113,7 +113,7 @@ jobs:
         shell: bash
         run: |
           for i in $(seq 1 180); do
-            if curl -fs http://127.0.0.1:8501/_stcore/health; then echo " — up after $((i * 5))s"; exit 0; fi
+            if curl -fs -o /dev/null http://127.0.0.1:8501/api/state; then echo " — up after $((i * 5))s"; exit 0; fi
             sleep 5
           done
           echo "App did not start within 15 minutes"; exit 1
