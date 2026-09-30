@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+          activate-environment: true
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-onnx-minilm
+      - name: Install dependencies
+        run: uv pip install -r requirements-dev.txt
+      - name: Run tests
+        run: python -m pytest -q -rs
+
+  launcher:
+    # Runs the real one-click launcher like a new user would, then checks the app answers HTTP.
+    name: Launcher (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest   # no uv: exercises the plain Python + pip fallback
+            uv: false
+          - os: macos-latest
+            uv: true
+          - os: windows-latest
+            uv: true
+    env:
+      STREAMLIT_SERVER_HEADLESS: "true"
+      GITLORE_NO_AUTO_SHUTDOWN: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        if: matrix.uv
+      - name: Start (macOS / Linux)
+        if: runner.os != 'Windows'
+        run: nohup ./start.sh > launcher.log 2>&1 &
+      - name: Start (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Start-Process cmd -ArgumentList '/c', 'start.bat > launcher.log 2>&1' -WindowStyle Hidden
+      - name: Wait for the app to respond
+        shell: bash
+        run: |
+          for i in $(seq 1 180); do
+            if curl -fs http://127.0.0.1:8501/_stcore/health; then echo " — up after $((i * 5))s"; exit 0; fi
+            sleep 5
+          done
+          echo "App did not start within 15 minutes"; exit 1
+      - name: Launcher log
+        if: always()
+        shell: bash
+        run: cat launcher.log || true

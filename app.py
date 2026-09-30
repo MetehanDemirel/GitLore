@@ -387,7 +387,7 @@ def main() -> None:
                 st.rerun()
 
             confirm("Clear Conversation?", "This removes all questions and answers from this session.", "Clear", clear)
-        st.caption("Runs locally on your CPU. Nothing leaves this computer.")
+        st.caption(f"GitLore {config.VERSION} · Runs locally on your CPU. Nothing leaves this computer.")
 
     # A different repository means a different conversation.
     if st.session_state.get("active_repo") != repo:
