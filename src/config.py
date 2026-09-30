@@ -10,7 +10,8 @@ VERSION = "0.2.0"  # keep in sync with CHANGELOG.md
 
 # --- Paths -------------------------------------------------------------------
 ROOT_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = ROOT_DIR / "data"
+# GITLORE_DATA_DIR moves everything GitLore stores (models, index, projects, demo) elsewhere.
+DATA_DIR = Path(os.environ["GITLORE_DATA_DIR"]) if os.environ.get("GITLORE_DATA_DIR") else ROOT_DIR / "data"
 MODELS_DIR = DATA_DIR / "models"
 CHROMA_DIR = DATA_DIR / "chroma"
 DB_PATH = DATA_DIR / "gitlore.db"          # projects, chats, settings (SQLite)

@@ -27,7 +27,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 uv venv --python 3.12
 .venv\Scripts\activate
 uv pip install -r requirements.txt
-streamlit run app.py
+python gitlore.py
 ```
 
 **macOS / Linux**
@@ -36,7 +36,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh   # once
 uv venv --python 3.12
 source .venv/bin/activate
 uv pip install -r requirements.txt
-streamlit run app.py
+python gitlore.py
 ```
 
 **Linux only:** the prebuilt LLM library works only on Alpine, so compile it (needs a C++ compiler, e.g.
@@ -52,15 +52,16 @@ Make sure `python --version` shows 3.11–3.13, then:
 python -m venv .venv
 # Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
 pip install -r requirements.txt          # Linux: add  --no-binary llama-cpp-python
-streamlit run app.py
+python gitlore.py
 ```
 
 ## First run
 
 1. A browser tab opens at `http://127.0.0.1:8501`.
-2. In the side panel, click **Download Model** (~1.1 GB, saved in `data/models/`) — one time only.
-3. Paste the path to a local Git repository and click **Index Repository**.
-4. Ask questions like *"Why was the auth flow changed?"* or *"Who introduced the caching layer?"*
+2. The built-in demo project **TaskFlow** is already open: browse its commits and diffs right away.
+3. In the assistant panel, click **Download Model** (~1.1 GB, saved in `data/models/`) — one time only.
+4. Ask questions, or select code in a diff, right-click and choose **Ask GitLore About Selection**.
+5. Add your own repositories with the project switcher (top left) → **Add Project…**, or in **Settings**.
 
 **To stop:** close the browser tab (the app exits by itself after ~30 s) or close the terminal window.
 

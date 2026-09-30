@@ -242,7 +242,7 @@ async def heartbeat(request: Request) -> Response:
 
 async def state(request: Request) -> Response:
     preset = current_preset()
-    downloaded = model_manager.is_downloaded(preset)
+    downloaded = model_manager.is_downloaded(preset) or bool(os.environ.get("GITLORE_FAKE_LLM"))
     editor_job = next((j for j in JOBS.running() if j["kind"] == "editor"), None)
     return ok({
         "version": config.VERSION,
@@ -258,7 +258,8 @@ async def state(request: Request) -> Response:
         "languages": config.LANGUAGES,
         "presets": {k: {"label": p.label, "size_gb": p.size_gb} for k, p in config.MODEL_PRESETS.items()},
         "model": {"label": preset.label, "filename": preset.filename, "downloaded": downloaded,
-                  "size_gb": round(model_manager.model_path(preset).stat().st_size / 1e9, 2) if downloaded else preset.size_gb},
+                  "size_gb": round(model_manager.model_path(preset).stat().st_size / 1e9, 2)
+                  if model_manager.is_downloaded(preset) else preset.size_gb},
         "editor": {"ready": vendor.monaco_ready(), "job": editor_job and editor_job["id"],
                    "path": f"/monaco/monaco-{config.MONACO_VERSION}/vs"},
         "projects": [project_view(p) for p in store.list_projects()],

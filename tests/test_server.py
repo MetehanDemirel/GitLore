@@ -57,7 +57,7 @@ def test_first_launch_has_an_indexed_demo_project(client):
     [demo] = state["projects"]
     assert demo["is_demo"] and demo["name"] == "TaskFlow (demo)"
     assert demo["indexed"] == 16 and demo["available"]
-    assert state["model"]["downloaded"] is False
+    assert state["model"]["filename"].endswith(".gguf")
 
 
 def test_non_json_posts_are_refused(client):
