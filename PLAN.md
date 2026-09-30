@@ -133,22 +133,81 @@ GitLore/
    (path, commit count, index/update/rebuild with progress) sections; "Get started" checklist until ready; chat
    with status line, streamed answers, hash citations linked to GitHub/GitLab, *Sources* expander; example
    questions; follows system light/dark theme; remembers last repo/model in `data/settings.json`.
-7. **Polish** — auto-shutdown watchdog ✅ (verified: exits ~30 s after the last tab closes). Remaining: README
-   screenshot, license (MIT?), test on macOS/Linux.
+7. **Release v0.1.0** ✅ — MIT license, CHANGELOG, CI on Windows/macOS/Linux × Python 3.11–3.13 plus a
+   real-launcher job per OS, release workflow. Found via CI: Linux needs a source build of llama-cpp-python
+   (upstream Linux wheel is musl-only); macOS + 3.13 upstream wheel is corrupt (launcher uses 3.12).
+   Released 2026-09-30. Remaining: README screenshot.
 
-## Claude Code skills to use while building (all already installed — nothing to download)
+---
+
+# v0.2 — GitLore Workspace (planned 2026-09-30)
+
+Turn GitLore from a chat page into a small **VS Code-like workspace for Git history**: browse commits,
+see colored diffs, select code and ask the AI about it, edit files and commit, with saved projects and
+chats, four languages and a dark theme.
+
+## Decisions
+
+| # | Decision | Choice | Why |
+|---|---|---|---|
+| D1 | Frontend | **New web UI with Monaco** (VS Code's editor), served by a small Python API. Streamlit is removed. | Real diff view, right-click menus, themes and shortcuts come built in. All of `src/` is reused unchanged. Streamlit couldn't give a VS Code feel. |
+| D2 | Frontend build | **No build step**: plain ES modules + Preact/htm (0.7 MB, vendored in the repo). | Keeps "clone → double-click start" working. Contributors and users never need Node.js. Revisit only if the UI outgrows it. |
+| D3 | Shipping Monaco | **Downloaded once on first launch** (18.6 MB, pinned version, sha512 integrity check), like the model. Only `min/vs` (25.6 MB) is kept. | Too big to commit; offline after first run. |
+| D4 | "Edit commits" | **Edit files in the working tree, then make a new commit.** Past commits are read-only. No amend, rebase or force. | Normal, safe Git. Rewriting history can destroy work. |
+| D5 | Languages | **English, Turkish, French, German** for the whole UI, and the AI is told to answer in the chosen language. | Qwen3 is multilingual. Answer quality in TR/FR/DE will be benchmarked like the model choice was. |
+| D6 | Theme | **Light / Dark / System** toggle. Monaco switches between its `vs` and `vs-dark` themes to match. | |
+| D7 | Projects & chats | A **project** = one local repository + its settings + its chats. Stored in **SQLite** (`data/gitlore.db`, stdlib, no new dependency). A chat can be anchored to a commit, file or selection. | Survives restarts; easy to list, rename, delete, export. |
+| D8 | Demo data | **"Try the Demo Project"** button generates a small Git repo on first use from a script: a toy app with a meaningful story (add login → switch to JWT → fix a bug → refactor → revert). | Users and our tests can try everything instantly. Generated rather than committed, so it's small and reproducible. |
+| D9 | Web server | **Starlette + uvicorn** (already installed as Streamlit dependencies), with server-sent events for streaming answers. | Dropping Streamlit also removes ~180 MB (pyarrow, pandas, pydeck, altair): faster install. |
+| D10 | UI testing | API with pytest (`TestClient`); UI flows (right-click, diff, theme, language) with **Playwright**, in CI only (dev dependency). | Streamlit's AppTest goes away with Streamlit; right-click and diffs need a real browser. |
+
+## Screen layout
+
+```
++-------------+------------------------------------------+----------------+
+| PROJECTS  v | a1b2c3d  Switch login to JWT · Ada · 3d  | AI ASSISTANT   |
+|  my-app     |------------------------------------------|                |
+|  demo       |  auth/login.py          (side-by-side)   |  > Why did     |
+|-------------|  - session.save(user)   + issue_jwt(u)   |    this change?|
+| COMMITS   / |                                          |                |
+|  a1b2c3d  * |  select text -> right-click:             |  Sessions did  |
+|  9f8e7d6    |     "Ask GitLore about this"             |  not scale...  |
+|  ...        |     "Explain this change"                |  [a1b2c3d] Ada |
+|-------------|                                          |                |
+| CHATS       |  [Edit file]  [Commit...]                |  [ Ask... ]    |
++-------------+------------------------------------------+----------------+
+ status bar: model ready · 200 commits indexed · EN | Dark
+```
+
+## Phases
+
+| Phase | Goal | Done when |
+|---|---|---|
+| **8. Foundation** | Starlette API over `src/`, static web shell (3-panel layout), theme toggle, i18n plumbing (EN strings), model download + indexing + chat with streaming ported. Streamlit removed. Launchers, CI and auto-shutdown updated (shutdown via page heartbeat). | Feature parity with v0.1 in the new UI; all CI green |
+| **9. Projects, chats & demo** | SQLite store; open/switch/new project; chat list with history (rename, delete); demo-project generator. | Restart the app and everything is still there; demo works offline |
+| **10. Commit explorer & diffs** | Commit list with search/filter; files changed per commit; Monaco diff (side-by-side and inline, colored). | Any commit's changes can be browsed like in VS Code |
+| **11. Ask AI from the code** | Right-click on a selection → "Ask GitLore" / "Explain this change"; the question carries the selection, file and commit as context; the assistant panel sits beside the diff. | Selection questions are answered with correct citations |
+| **12. Edit & commit** | Open a working-tree file in Monaco, edit, see the diff vs. HEAD, write a message, commit. Guards: shows `git status`, refuses to commit on detached HEAD or during merges/rebases. | A commit made in GitLore shows up in `git log` exactly like a CLI commit |
+| **13. Languages & release v0.2** | TR/FR/DE translations; AI answer-language benchmark; accessibility pass (keyboard, screen reader, contrast); screenshots; docs. | v0.2.0 released with CI green on 3 OSes |
+
+The earlier "better answers" ideas (exact-name search, date and author questions) move to **v0.3**.
+
+## Risks
+
+- **Scope:** this rebuilds the interface. Phase 8 must reach parity before new features, so `main` never has a half-working UI. Work happens on a `v0.2` branch until phase 8 is green.
+- **Translation quality:** a 1.7B model's Turkish/French/German answers may be weaker than its English ones. D5 includes a benchmark; if one language is poor, the UI still translates and the answer shows a note.
+- **Monaco download:** first launch needs internet for both model and Monaco (already true for the model).
+
+## Skills to use
 
 | When | Skill |
 |---|---|
-| Before phase 2 | `engineering:testing-strategy` — plan the pytest suite |
-| While coding | `run` — launch Streamlit and verify in the browser pane |
-| After each phase | `/code-review`, `/simplify` |
-| Before publishing | `security-review` (user-supplied paths → subprocess `git`), `engineering:documentation` for README |
-
-Not needed: `claude-api` (the app deliberately uses no Anthropic/OpenAI API).
+| Phase 8 layout and look | `frontend-design`, `web-design-guidelines` |
+| UI tests (right-click, diffs) | `webapp-testing` (Playwright) |
+| Each phase | `/code-review`, `/simplify`, `security-review` for phase 12 (writes to the user's repo) |
+| Phase 13 | `design:accessibility-review`, `engineering:documentation` |
 
 ## Open questions (decide later)
 
-- License (MIT suggested — note Qwen2.5-Coder models are Apache-2.0).
-- Also index file-level `git blame` for "who wrote this line" questions? (v2)
-- Package as a `pipx`/`uv tool` installable CLI (`gitlore /path/to/repo`)? (v2)
+- Also index file-level `git blame` for "who wrote this line" questions? (v0.3)
+- Package as a `pipx`/`uv tool` installable CLI (`gitlore /path/to/repo`)? (v0.3)
