@@ -33,14 +33,14 @@ jobs:
         run: |
           uv pip install -r requirements-dev.txt 2>&1 | tee install.log
           status=${PIPESTATUS[0]}
-          [ "$status" -eq 0 ] || echo "::error title=Install failed::$(tail -25 install.log | sed ':a;N;$!ba;s/\n/%0A/g')"
+          [ "$status" -eq 0 ] || python .github/annotate.py "Install failed" install.log
           exit "$status"
       - name: Run tests
         shell: bash
         run: |
           python -m pytest -q -rfEs --tb=short 2>&1 | tee pytest.log
           status=${PIPESTATUS[0]}
-          [ "$status" -eq 0 ] || echo "::error title=Tests failed::$(grep -E '^(FAILED|ERROR)|^E  |Error:' pytest.log | head -40 | sed ':a;N;$!ba;s/\n/%0A/g')"
+          [ "$status" -eq 0 ] || python .github/annotate.py "Tests failed" pytest.log
           exit "$status"
 
   launcher:
