@@ -161,7 +161,7 @@ def test_selected_code_is_shown_before_the_question_and_budgeted():
     focus = {"path": "auth/login.py", "commit": "a1b2c3d4e5", "text": "return issue_jwt(user)"}
     messages, used = chat_engine.build_messages(FakeLlm(), "What does this do?", [make_commit(1)], focus=focus)
     user = messages[-1]["content"]
-    assert "The user selected this code from auth/login.py in commit [a1b2c3d]" in user
+    assert "from auth/login.py. Commit [a1b2c3d] added it" in user
     assert user.index("return issue_jwt(user)") < user.index("Question: What does this do?")
 
     huge = {"path": "x.py", "text": "z" * 50_000}

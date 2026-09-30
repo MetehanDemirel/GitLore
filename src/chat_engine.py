@@ -63,12 +63,21 @@ def format_commit(c: Commit, include_diff: bool = True) -> str:
 
 
 def format_focus(focus: dict) -> str:
-    """The code the user selected (right-click → Ask GitLore), shown to the model before the question."""
-    where = focus.get("path") or "a file"
-    if focus.get("commit"):
-        where += f" in commit [{focus['commit'][:7]}]"
+    """The code the user selected (right-click → Ask GitLore), shown to the model before the question.
+
+    Small models don't connect "selected code" with "the commit that changed it" on their own, so the
+    link is stated explicitly: which commit added (right side) or removed (left side) the code.
+    """
+    path = focus.get("path") or "a file"
     text = (focus.get("text") or "")[:_FOCUS_MAX_CHARS]
-    return f"\n\nThe user selected this code from {where}:\n```\n{text}\n```"
+    commit = (focus.get("commit") or "")[:7]
+    if commit:
+        verb = "removed" if focus.get("side") == "original" else "added"
+        intro = (f"The user selected this code from {path}. Commit [{commit}] {verb} it "
+                 f"(that commit is listed first above; use its message to explain why)")
+    else:
+        intro = f"The user selected this code from {path} (their current, uncommitted version)"
+    return f"\n\n{intro}:\n```\n{text}\n```"
 
 
 def build_messages(
@@ -96,7 +105,9 @@ def build_messages(
         messages += [{"role": "user", "content": prev_q}, {"role": "assistant", "content": prev_a}]
 
     focus_block = format_focus(focus) if focus and focus.get("text") else ""
-    question_block = f"{focus_block}\n\nQuestion: {question.strip()}"
+    # Small models follow the instruction closest to the end best, so the answer language is repeated here.
+    reminder = f"\n(Answer in {ANSWER_LANGUAGES[language]}.)" if language != "en" and language in ANSWER_LANGUAGES else ""
+    question_block = f"{focus_block}\n\nQuestion: {question.strip()}{reminder}"
     budget = (
         config.MAX_PROMPT_TOKENS
         - _TEMPLATE_SLACK_TOKENS * (len(messages) + 1)
