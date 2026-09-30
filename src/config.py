@@ -42,14 +42,22 @@ DEFAULT_PRESET = "fast"
 # --- LLM runtime -------------------------------------------------------------
 N_CTX = 4096               # total context window (tokens)
 ANSWER_TOKENS = 512        # reserved for the model's reply
-PROMPT_OVERHEAD_TOKENS = 300  # system prompt + question + formatting
+# CPU prompt reading runs at only ~110-130 tokens/s, so the prompt size directly sets the wait before
+# the first word appears. ~1,800 tokens ≈ 15 s on a mid-range laptop; the full 3,500 would be ~30 s.
+MAX_PROMPT_TOKENS = 1800
+PROMPT_DIFF_CHARS = 600    # per-commit diff shown to the LLM (the index keeps MAX_DIFF_CHARS_PER_COMMIT)
 TEMPERATURE = 0.2
 N_GPU_LAYERS = -1          # no-op on the default CPU build; used if someone installs a GPU build
 
 
 def default_n_threads() -> int:
-    """Approximate physical cores; hyperthreads don't help llama.cpp much."""
+    """Threads for generating tokens: approx. physical cores (hyperthreads don't help here)."""
     return max(1, (os.cpu_count() or 2) // 2)
+
+
+def default_n_threads_batch() -> int:
+    """Threads for reading the prompt: all logical cores (~12% faster in benchmarks)."""
+    return max(1, os.cpu_count() or 2)
 
 
 # --- Git ingestion -----------------------------------------------------------

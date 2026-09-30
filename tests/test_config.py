@@ -11,11 +11,12 @@ def test_presets_are_gguf():
 
 
 def test_context_budget_leaves_room_for_commits():
-    assert config.N_CTX - config.ANSWER_TOKENS - config.PROMPT_OVERHEAD_TOKENS >= 2048
+    assert config.MAX_PROMPT_TOKENS + config.ANSWER_TOKENS <= config.N_CTX
 
 
 def test_model_path_is_inside_data_dir():
-    assert model_manager.model_path().parent == config.MODELS_DIR
+    preset = config.MODEL_PRESETS[config.DEFAULT_PRESET]
+    assert model_manager.model_path(preset).parent == config.MODELS_DIR
 
 
 def test_default_n_threads_is_positive():

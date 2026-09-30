@@ -102,8 +102,11 @@ GitLore/
 3. **Vector store** ✅ — `index_commits()` (incremental, batched, progress callback), `search()` (semantic + exact
    commit-hash matching), `count()`, `reset()`; telemetry disabled; cosine distance; 8 tests.
    Benchmark (psf/requests, i5-11400H): index ~28 commits/s (2,000 in ~70 s), re-check 0.1 s, search ~0.3 s.
-4. **Model manager** — download with progress, load, presets; smoke test generates a few tokens.
-5. **Chat engine** — prompt assembly with token budget, streaming generator.
+4. **Model manager** ✅ — presets + custom Hugging Face GGUF, download with byte progress (resumable), delete,
+   CPU load (`n_threads` = physical cores, `n_threads_batch` = all cores), friendly `ModelError`s.
+5. **Chat engine** ✅ — prompt capped at `MAX_PROMPT_TOKENS` (1,800) measured with the model's tokenizer; diffs
+   trimmed to 600 chars in the prompt; message-only fallback; short follow-ups reuse the previous turn's commits.
+   Measured on i5-11400H: first word after ~12–15 s (was ~28 s with a full 3,500-token prompt), ~25 tokens/s after.
 6. **UI** — sidebar (repo path, commit count, model preset, Index button, status), chat, citations expander.
 7. **Polish** — auto-shutdown watchdog, error messages, README with screenshot, license (MIT?).
 
