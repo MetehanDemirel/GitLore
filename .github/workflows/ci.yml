@@ -16,6 +16,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         python: ["3.11", "3.12", "3.13"]
+        exclude:
+          # Upstream's llama-cpp-python 0.3.19 cp313 macOS wheel is a malformed ZIP that uv rejects.
+          # The launcher always uses Python 3.12, so users are unaffected (see SETUP.md).
+          - os: macos-latest
+            python: "3.13"
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -32,7 +37,10 @@ jobs:
         shell: bash
         run: |
           set +e  # Actions runs bash with -e -o pipefail; keep going to report the failure
-          uv pip install -r requirements-dev.txt 2>&1 | tee install.log
+          extra=()
+          # Same as start.sh: the prebuilt Linux wheel is musl-only, so build llama-cpp-python from source.
+          [ "$RUNNER_OS" = "Linux" ] && extra=(--no-binary-package llama-cpp-python --index-strategy unsafe-best-match)
+          uv pip install "${extra[@]}" -r requirements-dev.txt 2>&1 | tee install.log
           status=${PIPESTATUS[0]}
           [ "$status" -eq 0 ] || python .github/annotate.py "Install failed" install.log
           exit "$status"

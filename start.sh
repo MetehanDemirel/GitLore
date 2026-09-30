@@ -27,12 +27,23 @@ fi
 
 # 2. Install dependencies only when requirements.txt changed
 if ! cmp -s requirements.txt .venv/requirements.stamp; then
+    UV_EXTRA=(); PIP_EXTRA=()
+    if [ "$(uname -s)" = "Linux" ]; then
+        # The prebuilt Linux llama-cpp-python wheel only works on musl (Alpine), so build it from
+        # source instead. CMake is fetched automatically; only a C/C++ compiler is needed.
+        command -v c++ >/dev/null || command -v g++ >/dev/null || command -v clang++ >/dev/null \
+            || fail "A C++ compiler is needed on Linux. Ubuntu/Debian: sudo apt install build-essential  Fedora: sudo dnf install gcc-c++"
+        echo "[GitLore] Linux: compiling the LLM library from source (one time, about 5 minutes)..."
+        UV_EXTRA=(--no-binary-package llama-cpp-python --index-strategy unsafe-best-match)
+        PIP_EXTRA=(--no-binary llama-cpp-python)
+    fi
     echo "[GitLore] Installing dependencies (first run takes a few minutes)..."
     if [ "$HAS_UV" = 1 ]; then
-        uv pip install --python "$VENV_PY" -r requirements.txt
+        uv pip install --python "$VENV_PY" ${UV_EXTRA[@]+"${UV_EXTRA[@]}"} -r requirements.txt
     else
-        "$VENV_PY" -m pip install --disable-pip-version-check -r requirements.txt
+        "$VENV_PY" -m pip install --disable-pip-version-check ${PIP_EXTRA[@]+"${PIP_EXTRA[@]}"} -r requirements.txt
     fi
+    "$VENV_PY" -c "import llama_cpp" || fail "The LLM library was installed but cannot load on this system."
     cp requirements.txt .venv/requirements.stamp
 fi
 

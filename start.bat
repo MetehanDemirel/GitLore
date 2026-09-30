@@ -42,6 +42,10 @@ if "%HAS_UV%"=="1" (
 ) else (
     "%VENV_PY%" -m pip install --disable-pip-version-check -r requirements.txt || goto :fail
 )
+"%VENV_PY%" -c "import llama_cpp" || (
+    echo [GitLore] The LLM library was installed but cannot load on this system.
+    goto :fail
+)
 copy /y requirements.txt ".venv\requirements.stamp" >nul
 
 rem --- 3. Run ---

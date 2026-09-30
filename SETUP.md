@@ -39,13 +39,19 @@ uv pip install -r requirements.txt
 streamlit run app.py
 ```
 
+**Linux only:** the prebuilt LLM library works only on Alpine, so compile it (needs a C++ compiler, e.g.
+`sudo apt install build-essential`; takes about 5 minutes once):
+```bash
+uv pip install --no-binary-package llama-cpp-python --index-strategy unsafe-best-match -r requirements.txt
+```
+
 ## Alternative: plain pip
 
 Make sure `python --version` shows 3.11–3.13, then:
 ```bash
 python -m venv .venv
 # Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt          # Linux: add  --no-binary llama-cpp-python
 streamlit run app.py
 ```
 
@@ -69,7 +75,9 @@ Delete the project folder. The embedding model is cached separately in `~/.cache
 | `llama-cpp-python` tries to compile / "CMake" or "cl.exe not found" errors | You're on an unsupported Python (usually 3.14) or didn't use `requirements.txt` (it contains the prebuilt-wheel index). Use `uv venv --python 3.12`. |
 | `tokenizers` build error mentioning Rust/cargo | You installed packages without `requirements.txt`'s `huggingface-hub<2` cap. Reinstall from `requirements.txt`. |
 | "git not found" | Install Git and reopen the terminal. |
-| Answers are slow | Normal on CPU: expect ~5–20 tokens/sec. Lower "commits to index" or use the default 1.5B model. |
+| Answers are slow | Normal on CPU: expect ~5–20 tokens/sec. Lower "commits to index"; the first words take ~10–15 s because the model reads the relevant commits first. |
+| macOS + Python 3.13 with uv: "ZIP file contains trailing contents" | That prebuilt file is malformed upstream. Use Python 3.12 (`uv venv --python 3.12`), which the launcher does automatically. |
+| Linux: "A C++ compiler is needed" | GitLore compiles its LLM library once on Linux (the prebuilt one only works on Alpine). Install a compiler: `sudo apt install build-essential` (Ubuntu/Debian) or `sudo dnf install gcc-c++` (Fedora), then run `./start.sh` again. |
 | Intel Mac: install compiles for a long time | No prebuilt wheel exists for Intel Macs; it builds from source once (needs Xcode Command Line Tools). |
 
 > **GPU?** Not supported out of the box, on purpose, to keep setup simple. Advanced users who
