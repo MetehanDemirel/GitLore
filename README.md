@@ -10,7 +10,7 @@
 - **Runs on any ordinary computer** — CPU only, no GPU needed (Linux compiles one library on first install)
 - **One-click start** — double-click `start.bat` (Windows) or run `./start.sh` (macOS/Linux)
 
-> **Status: v0.2.1.** A VS Code-like workspace: commit timeline, colored diffs, right-click "Ask GitLore", edit and commit, saved projects and chats, English, Turkish, French and German, light and dark themes. See [CHANGELOG.md](CHANGELOG.md) and [PLAN.md](PLAN.md).
+> **Status: v0.3.0.** A calm, VS Code-like workspace for Git history: colored diffs, one-click "Explain", instant insights (categories, heatmap, contributors, releases, search), AI-written repository history, timeline, "what changed while I was away" and onboarding briefs, and an optional online mode for public GitHub repositories. See [CHANGELOG.md](CHANGELOG.md).
 
 ## Quick start
 
@@ -32,13 +32,10 @@ all in a VS Code-like browser workspace built on Monaco. Details: [PLAN.md](PLAN
 
 ## Roadmap
 
-- **v0.3:** hideable panels and a Zen mode, more color themes, Spanish, Italian and Chinese, one-click
-  "Explain" buttons, a much bigger demo project, and an **Insights** view: commit categories (features,
-  fixes, refactors, performance, security), contributors, hot files, a commit heatmap, releases, branches
-  and comparisons.
-- **v0.4:** AI-written, cited **repository history** and **timeline**, "What changed while I was away?",
-  onboarding briefs for newcomers, answers that dig for *why*, minimal developer profiles and advanced search.
-- **v0.5:** optional **online mode**: add a GitHub repository by URL, live updates, and the pull requests
-  and discussions behind each commit.
+v0.3 (released) contains everything planned for v0.3–v0.5. Next:
+
+- UI translations for Spanish, Italian and Chinese, and for the new screens in Turkish, French and German.
+- Private GitHub repositories (sign-in) — an open decision.
+- Saved searches.
 
 Details and open decisions: [PLAN.md](PLAN.md#v03-and-beyond--roadmap-planned-2026-09-30).

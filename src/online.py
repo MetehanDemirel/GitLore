@@ -60,7 +60,8 @@ def clone(owner: str, repo: str, depth: int, progress) -> Path:
             progress(int(cur_count or 0), int(max_count or 0), stage)
 
     try:
-        git.Repo.clone_from(f"https://github.com/{owner}/{repo}.git", target, depth=depth, progress=_Progress(),
+        git.Repo.clone_from(f"https://github.com/{owner}/{repo}.git", target, progress=_Progress(),
+                            multi_options=[f"--depth={int(depth)}"],  # passed explicitly: the depth kwarg was ignored
                             env={"GIT_TERMINAL_PROMPT": "0"})  # never prompt for a password
     except git.GitCommandError as e:
         shutil.rmtree(target, ignore_errors=True)

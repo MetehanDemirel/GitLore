@@ -62,6 +62,12 @@ python gitlore.py
 3. In the assistant panel, click **Download Model** (~1.1 GB, saved in `data/models/`) — one time only.
 4. Ask questions, or select code in a diff, right-click and choose **Ask GitLore About Selection**.
 5. Add your own repositories with the project switcher (top left) → **Add Project…**, or in **Settings**.
+6. Optional: add a public GitHub repository with **Add GitHub Repository…** (needs internet; GitLore
+   clones the newest 1,000 commits). Set a `GITHUB_TOKEN` environment variable before starting to raise
+   GitHub's limit of 60 requests per hour; GitLore never saves it.
+
+**Shortcuts:** Ctrl+B sidebar · Ctrl+Alt+B assistant · Ctrl+K Z Zen mode (Esc leaves) · Ctrl+S save
+(Cmd on macOS). All are listed in **Settings → Keyboard Shortcuts**.
 
 **To stop:** close the browser tab (the app exits by itself after ~30 s) or close the terminal window.
 

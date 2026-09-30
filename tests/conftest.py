@@ -34,3 +34,9 @@ class RepoBuilder:
 @pytest.fixture
 def rb(tmp_path: Path) -> RepoBuilder:
     return RepoBuilder(tmp_path / "repo")
+
+
+@pytest.fixture
+def make_repo(tmp_path: Path):
+    """Factory for extra throwaway repositories: make_repo("other")."""
+    return lambda name: RepoBuilder(tmp_path / name)

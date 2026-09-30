@@ -306,5 +306,6 @@
   "welcome.step4": "Open Insights and Story for the big picture: who, what, when and why.",
   "welcome.brief": "Read the Welcome Brief",
   "welcome.openGithub": "Add from GitHub",
-  "welcome.shortcuts": "Ctrl+B hides the sidebar, Ctrl+Alt+B the assistant, Ctrl+K Z enters Zen mode."
+  "welcome.shortcuts": "Ctrl+B hides the sidebar, Ctrl+Alt+B the assistant, Ctrl+K Z enters Zen mode.",
+  "panels.focusChat": "Focus Chat"
 }

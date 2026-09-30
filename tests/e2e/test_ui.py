@@ -51,7 +51,7 @@ def server(tmp_path_factory):
         assert proc.poll() is None, proc.stdout.read().decode(errors="replace")
         try:
             state = _get(url + "api/state")
-            if state["editor"]["ready"] and state["projects"] and state["projects"][0]["indexed"] == 16:
+            if state["editor"]["ready"] and state["projects"] and state["projects"][0]["indexed"] > 150:
                 break
         except OSError:
             pass
@@ -74,8 +74,8 @@ def app(server, page: Page):
 
 
 def open_commit(page: Page, subject: str) -> None:
-    # Anchored: "Add CSV export" must not also match 'Revert "Add CSV export"'.
-    page.locator(".commit .subject").filter(has_text=re.compile("^" + re.escape(subject))).click()
+    # Exact: "Add CSV export" must not also match 'Revert "Add CSV export"' or "Add CSV export again…".
+    page.locator(".commit .subject").filter(has_text=re.compile("^" + re.escape(subject) + "$")).click()
     page.wait_for_selector(".monaco-diff-editor .view-lines", timeout=30000)
     page.wait_for_timeout(500)
 
@@ -121,7 +121,7 @@ def context_menu_click(page: Page, box: dict, label: str) -> None:
 def test_first_launch_opens_the_demo_project(app: Page):
     expect(app.locator(".project-switch .name")).to_have_text("TaskFlow (demo)")
     expect(app.locator(".project-switch .tag")).to_have_text("Demo")
-    expect(app.locator(".commit")).to_have_count(16)
+    assert app.locator(".commit").count() > 150
     expect(app.get_by_role("heading", name="Welcome to GitLore")).to_be_visible()
 
 
@@ -136,7 +136,7 @@ def test_commit_diff_and_message(app: Page):
 
 
 def test_right_click_explain_and_open_citation(app: Page):
-    open_commit(app, "Fix overdue filter")
+    open_commit(app, "Fix overdue filter including tasks due today")
     box = select_line(app, "t.due < today")
     context_menu_click(app, box, "Explain This Change")
     expect(app.locator(".msg.user .bubble").last).to_contain_text("Explain this code")
@@ -151,12 +151,10 @@ def test_right_click_explain_and_open_citation(app: Page):
 
 
 def test_theme_toggle_and_language_switch(app: Page):
-    html = app.locator("html")
-    before = html.get_attribute("data-theme")
-    app.locator(".statusbar button", has_text="System").click()
-    expect(html).not_to_have_attribute("data-theme", before)
+    app.locator(".statusbar button", has_text="System").click()  # opens the theme settings
+    app.get_by_role("radio", name="Sepia").click()
+    expect(app.locator("html")).to_have_attribute("data-theme", "sepia")
 
-    app.get_by_role("button", name="Settings").click()
     app.get_by_label("Language").select_option("de")
     app.wait_for_selector(".commit")
     expect(app.get_by_role("button", name="Verlauf")).to_be_visible()
@@ -165,7 +163,7 @@ def test_theme_toggle_and_language_switch(app: Page):
     app.get_by_label("Sprache").select_option("en")
     app.wait_for_selector(".commit")
     app.get_by_role("button", name="Settings").click()
-    app.get_by_role("button", name="System").click()
+    app.get_by_role("radio", name="System").click()
 
 
 def test_edit_save_and_commit(app: Page):

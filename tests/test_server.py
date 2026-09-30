@@ -56,7 +56,7 @@ def test_first_launch_has_an_indexed_demo_project(client):
     assert state["settings"]["language"] == "en" and state["settings"]["theme"] == "system"
     [demo] = state["projects"]
     assert demo["is_demo"] and demo["name"] == "TaskFlow (demo)"
-    assert demo["indexed"] == 16 and demo["available"]
+    assert demo["indexed"] > 150 and demo["available"]
     assert state["model"]["filename"].endswith(".gguf")
 
 
@@ -107,23 +107,23 @@ def test_reindex_job(client):
     job = post(client, f"/api/projects/{pid}/index", {"rebuild": True}).json()["job"]
     wait_for_jobs()
     status = client.get(f"/api/jobs/{job}").json()
-    assert status["status"] == "done" and status["result"]["indexed"] == 16
+    assert status["status"] == "done" and status["result"]["indexed"] > 150
 
 
 # --------------------------------------------------------------------------- history & diffs
 def test_commit_list_detail_and_diff(client):
     pid = demo_project(client)["id"]
     commits = client.get(f"/api/projects/{pid}/commits").json()
-    assert len(commits) == 16 and commits[0]["subject"] == "Release 1.0"
+    assert len(commits) > 150
     jwt = next(c for c in commits if c["subject"].startswith("Switch login"))
-    assert client.get(f"/api/projects/{pid}/commits?q=jwt").json()[0]["hash"] == jwt["hash"]
+    assert jwt["hash"] in [c["hash"] for c in client.get(f"/api/projects/{pid}/commits?q=jwt").json()]
 
     detail = client.get(f"/api/projects/{pid}/commits/{jwt['hash']}").json()
     assert "load\nbalancer" in detail["message"] and [f["path"] for f in detail["files"]] == ["taskflow/auth.py"]
     diff = client.get(f"/api/projects/{pid}/commits/{jwt['hash']}/file", params={"path": "taskflow/auth.py"}).json()
     assert "SESSIONS" in diff["original"] and "hmac" in diff["modified"] and diff["language"] == "python"
 
-    rename = next(c for c in commits if c["subject"].startswith("Rename"))
+    rename = next(c for c in commits if c["subject"].startswith("Rename tasks.py"))
     files = client.get(f"/api/projects/{pid}/commits/{rename['hash']}").json()["files"]
     assert {"path": "taskflow/models.py", "status": "renamed", "old_path": "taskflow/tasks.py"}.items() <= next(
         f for f in files if f["path"] == "taskflow/models.py").items()

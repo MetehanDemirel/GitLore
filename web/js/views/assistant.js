@@ -119,6 +119,9 @@ export function Assistant() {
         <${Icon} name="chevron" />
       </button>
       <button class="icon-btn" aria-label=${t("assistant.newChat")} title=${t("assistant.newChat")} onClick=${newChat}><${Icon} name="plus" /></button>
+      <button class="icon-btn" aria-label=${app.zen === "chat" ? t("panels.exitZen") : t("panels.focusChat")}
+        title=${app.zen === "chat" ? t("panels.exitZen") : t("panels.focusChat")} aria-pressed=${app.zen === "chat"}
+        onClick=${() => app.toggleZen("chat")}><${Icon} name="zen" /></button>
       ${current && html`
         <button class="icon-btn" aria-label=${t("assistant.renameChat")} title=${t("assistant.renameChat")}
           onClick=${() => setDialog("rename")}><${Icon} name="edit" /></button>

@@ -1,5 +1,52 @@
 # Changelog
 
+## [0.3.0] — 2026-09-30
+
+GitLore now explains **why** a project became what it is, helps people who are new or coming back catch
+up, and stays calm to look at. This release contains everything planned for v0.3, v0.4 and v0.5.
+
+**Upgrading:** run `start.bat` / `./start.sh` as before. The demo project is rebuilt once (the old one is
+replaced automatically); your own projects, chats and model are kept.
+
+### Calm workspace
+- Hide the sidebar (**Ctrl+B**, or click the active view's icon) and the assistant (**Ctrl+Alt+B**).
+- **Zen mode** (**Ctrl+K Z**, **Esc** to leave): only the editor, or only the chat (*Focus Chat*).
+- Nine color themes: System, Light, Dark, Dim, Solarized Light/Dark, Sepia, and High Contrast Light/Dark,
+  all checked against WCAG contrast. The code editor follows the theme.
+- **Explain Commit** button in the commit header, and a small **Explain** action on every changed block
+  of a diff (no right-click needed).
+
+### A bigger demo
+- TaskFlow now has ~2 years of history: 189 commits by 8 fictional contributors, releases v1.0.0 → v2.2.1,
+  feature branches and merges, a package restructure, a security fix, a performance fix, reverts and
+  issue references. Still generated in a fraction of a second, identical on every computer.
+
+### Insights (instant, no AI)
+- Commit **categories** (feature, bug fix, refactor, performance, security, docs, tests, dependencies,
+  large change) as chips and search filters.
+- Overview with a **commit heatmap** and monthly activity, **contributors** and minimal profiles,
+  **hot files**, **"who wrote this?"** (blame), a **release explorer**, **branches** and **compare**.
+- **Advanced search:** `author:` `path:` `type:` `since:` `until:` `release:` `is:large`, plus words.
+
+### The story of a repository (AI, cached)
+- **Generate Repository History:** a cited narrative of the project, era by era (by release).
+- **Timeline** of key events; click an event for its commits, or ask the AI why it happened.
+- **What Changed While I Was Away?** — since your last visit or any date.
+- **Onboarding brief** for newcomers: the project in a page, key people, where to start reading.
+- Answers **dig for why**: related commits (same issue number, reverts) are added to the evidence, and
+  citations of commits that don't exist are removed.
+
+### Online mode (optional)
+- Add a public GitHub repository by URL (`github.com/owner/repo`). GitLore makes a shallow clone
+  (newest 1,000 commits), keeps it up to date while open, and shows the **pull requests and issues behind
+  a commit**, GitHub releases and repository info. Online projects are read-only mirrors.
+- No sign-in and nothing stored: anonymous requests (60/hour, cached). A `GITHUB_TOKEN` environment
+  variable raises the limit. Private repositories are not supported yet.
+
+### Languages
+- Answers can now be in Spanish, Italian and Chinese too. **UI translations** for these three, and for
+  the new v0.3 screens in Turkish, French and German, are still to come; those texts show in English.
+
 ## [0.2.1] — 2026-09-30
 
 Supersedes 0.2.0: the same workspace, now fully verified.

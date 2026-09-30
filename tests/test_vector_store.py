@@ -72,10 +72,8 @@ def test_subfolder_uses_same_index(history):
     assert vector_store.count(str(history.path / "auth")) == 4
 
 
-def test_repos_are_isolated(history, tmp_path):
-    from conftest import RepoBuilder
-
-    other = RepoBuilder(tmp_path / "other")
+def test_repos_are_isolated(history, make_repo):
+    other = make_repo("other")
     other.commit("Unrelated", {"x.txt": "x\n"})
     vector_store.index_commits(str(history.path), get_commits(str(history.path)))
     assert vector_store.count(str(other.path)) == 0
