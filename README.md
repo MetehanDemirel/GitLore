@@ -1,14 +1,16 @@
 # GitLore
 
+[![CI](https://github.com/MetehanDemirel/GitLore/actions/workflows/ci.yml/badge.svg)](https://github.com/MetehanDemirel/GitLore/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Ask plain-English questions about a Git repository's history — answered by a small AI model running entirely on your own computer.**
 
 > "Why did we change the authentication flow?" → an answer that cites the actual commits and authors.
 
-- 🔒 **100% local & private** — no API keys, no cloud, works offline after the first run
-- 💻 **Runs on any ordinary computer** — CPU only, no GPU or compiler needed
-- ⚡ **One-click start** — double-click `start.bat` (Windows) or run `./start.sh` (macOS/Linux)
+- **100% local & private** — no API keys, no cloud, works offline after the first run
+- **Runs on any ordinary computer** — CPU only, no GPU needed (Linux compiles one library on first install)
+- **One-click start** — double-click `start.bat` (Windows) or run `./start.sh` (macOS/Linux)
 
-> **Status: working preview.** Indexing, search and chat work end to end on Windows. See [PLAN.md](PLAN.md) for what's next.
+> **Status: v0.1.0.** Tested on Windows, macOS and Linux. See [CHANGELOG.md](CHANGELOG.md) and [PLAN.md](PLAN.md).
 
 ## Quick start
 

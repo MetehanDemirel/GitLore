@@ -10,7 +10,7 @@ or run `./start.sh` (macOS / Linux). Needs Git and either [uv](https://docs.astr
 See [SETUP.md](https://github.com/MetehanDemirel/GitLore/blob/main/SETUP.md).
 
 ### Features
-- One-click launchers that create an isolated environment and install everything — no compiler, GPU or Docker needed.
+- One-click launchers that create an isolated environment and install everything — no GPU or Docker needed (Linux compiles the LLM library once; needs a C++ compiler).
 - Side panel to download the model (Qwen3-1.7B, 1.1 GB, one time) and index any local repository with live progress.
 - Chat with streamed answers, a stop button, commit citations linked to GitHub/GitLab, and the commits each answer used.
 - Fast history reading: 2,000 commits parse in under a second; merge commits carry their pull request's changes.
