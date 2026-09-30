@@ -25,5 +25,5 @@ The first run installs dependencies and downloads a ~1.1 GB model. Full instruct
 ## How it works
 
 GitLore reads your commit history with GitPython, indexes it for semantic search in ChromaDB,
-and answers questions with [Qwen2.5-Coder](https://huggingface.co/Qwen) running locally via llama.cpp,
+and answers questions with [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) running locally via llama.cpp,
 all behind a Streamlit chat UI. Details: [PLAN.md](PLAN.md).

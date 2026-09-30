@@ -69,7 +69,10 @@ def build_messages(
     def tokens(text: str) -> int:
         return len(llm.tokenize(text.encode("utf-8"), add_bos=False, special=False))
 
-    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    system = SYSTEM_PROMPT
+    if getattr(llm, "metadata", {}).get("general.architecture") == "qwen3":
+        system += " /no_think"  # Qwen3's switch to skip its slow hidden reasoning step
+    messages: list[dict] = [{"role": "system", "content": system}]
     if history:
         prev_q, prev_a = history[-1]
         prev_a = _truncate_to_tokens(llm, prev_a, _HISTORY_ANSWER_TOKENS)
@@ -101,17 +104,39 @@ def build_messages(
 
 
 def stream_answer(llm: "Llama", messages: list[dict]) -> Iterator[str]:
-    """Yield answer text chunks (for st.write_stream)."""
-    for chunk in llm.create_chat_completion(
-        messages=messages,
-        stream=True,
-        max_tokens=config.ANSWER_TOKENS,
-        temperature=config.TEMPERATURE,
-        repeat_penalty=1.1,
-    ):
-        delta = chunk["choices"][0]["delta"].get("content")
-        if delta:
-            yield delta
+    """Yield answer text chunks, without any <think>…</think> block reasoning models emit first."""
+    chunks = (
+        chunk["choices"][0]["delta"].get("content") or ""
+        for chunk in llm.create_chat_completion(
+            messages=messages,
+            stream=True,
+            max_tokens=config.ANSWER_TOKENS,
+            temperature=config.TEMPERATURE,
+            repeat_penalty=1.1,
+        )
+    )
+    yield from _strip_think(chunks)
+
+
+def _strip_think(chunks: Iterator[str]) -> Iterator[str]:
+    """Drop a leading <think>…</think> block (and the blank lines after it) from a text stream."""
+    head = ""
+    for piece in chunks:
+        head += piece
+        stripped = head.lstrip()
+        if "<think>".startswith(stripped):  # still could be the opening tag
+            continue
+        if stripped.startswith("<think>"):
+            if "</think>" not in stripped:
+                continue
+            stripped = stripped.split("</think>", 1)[1]
+        head = stripped.lstrip()
+        break
+    if head:
+        yield head
+    for piece in chunks:
+        if piece:
+            yield piece
 
 
 def _truncate_to_tokens(llm: "Llama", text: str, max_tokens: int) -> str:

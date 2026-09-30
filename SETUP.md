@@ -52,8 +52,8 @@ streamlit run app.py
 ## First run
 
 1. A browser tab opens at `http://127.0.0.1:8501`.
-2. The model (~1.1 GB) downloads into `data/models/` — one time only.
-3. Paste the path to a local git repository in the sidebar and click **Index**.
+2. In the side panel, click **Download Model** (~1.1 GB, saved in `data/models/`) — one time only.
+3. Paste the path to a local Git repository and click **Index Repository**.
 4. Ask questions like *"Why was the auth flow changed?"* or *"Who introduced the caching layer?"*
 
 **To stop:** close the browser tab (the app exits by itself after ~30 s) or close the terminal window.

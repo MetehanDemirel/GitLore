@@ -128,3 +128,23 @@ def test_real_model_answers_with_citation():
     assert used == [commit]
     assert "a1b2c3d" in answer
     assert any(w in answer.lower() for w in ("scale", "pods", "session"))
+
+
+@pytest.mark.parametrize("pieces, expected", [
+    (["<think>\n\n</think>\n\n", "Because ", "[a1b2c3d]."], "Because [a1b2c3d]."),     # Qwen3 /no_think
+    (["<thi", "nk>plan it", "</th", "ink>\n", "Answer"], "Answer"),                   # tags split across chunks
+    (["<think>long reasoning</think>Done"], "Done"),
+    (["Plain ", "answer"], "Plain answer"),                                           # models that never think
+    (["", "\n", "Hi"], "Hi"),
+    (["I think <think> is a tag"], "I think <think> is a tag"),                       # only a *leading* block is removed
+])
+def test_think_blocks_are_stripped_from_the_stream(pieces, expected):
+    assert "".join(chat_engine._strip_think(iter(pieces))) == expected
+
+
+def test_qwen3_models_get_the_no_think_switch():
+    class Qwen3(FakeLlm):
+        metadata = {"general.architecture": "qwen3"}
+
+    assert chat_engine.build_messages(Qwen3(), "Why?", [])[0][0]["content"].endswith("/no_think")
+    assert "/no_think" not in chat_engine.build_messages(FakeLlm(), "Why?", [])[0][0]["content"]

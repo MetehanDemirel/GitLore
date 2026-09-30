@@ -31,13 +31,35 @@ requiring Visual Studio + CUDA Toolkit, or an external Ollama install. Both brea
 The code still passes `n_gpu_layers=-1`, so anyone who *manually* installs a GPU build gets it for free —
 but that's undocumented/unsupported territory.
 
-## Model
+## Model choice
 
-- **Default:** `Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF` → `qwen2.5-coder-1.5b-instruct-q4_k_m.gguf` (1.12 GB, Apache-2.0). Code-aware, fast on CPU.
-- **Optional "better answers" preset:** `Qwen/Qwen2.5-Coder-3B-Instruct-GGUF` → `q4_k_m` (2.1 GB), slower.
-- Model repo/filename live in one config dict in `model_manager.py` (and a sidebar dropdown), so swapping models is a one-line change.
-- Avoid "thinking" models (e.g. Qwen3) for now: their `<think>` output complicates streaming for little gain at this size.
-- Note: models must be supported by the llama.cpp bundled in 0.3.19 (March 2026).
+**Default: Qwen3-1.7B** (`unsloth/Qwen3-1.7B-GGUF` → `Qwen3-1.7B-Q4_K_M.gguf`, 1.1 GB, Apache-2.0, no login).
+Sent with `/no_think` so it skips its hidden reasoning step; any `<think>` block is stripped from the stream.
+Other models can still be used via *Custom GGUF* in the side panel. Presets live in `src/config.py`.
+
+**How it was chosen (2026-09-30).** Priorities: responsiveness first, reliability second. Each model ran
+GitLore's real pipeline (same retrieval, same 1,800-token prompt budget) on 300 commits of `psf/requests`,
+i5-11400H CPU, Q4 quantization. Five questions with known answers: why / who / when+who / "what did
+<hash> change" / and a trap question the history can't answer. 2 points each: cites the right commit +
+states the right fact; for the trap, says it isn't in the commits. Retrieval ranked the right commit #1 for
+every question, so differences are the model's.
+
+| Model | Size | First word | Tokens/s | Score |
+|---|---|---|---|---|
+| **Qwen3-1.7B** | 1.1 GB | 10.2 s | 24 | **9/10** |
+| Qwen3-4B-Instruct-2507 | 2.4 GB | 25.8 s | 10 | 9/10 |
+| LFM2-2.6B | 1.6 GB | 16.0 s | 20 | 8/10 |
+| Qwen2.5-Coder-3B (old "better" preset) | 2.1 GB | 17.8 s | 14 | 7/10 |
+| LFM2.5-1.2B | 0.7 GB | 6.7 s | 38 | 5/10 |
+| Llama-3.2-1B | 0.8 GB | 6.4 s | 32 | 5/10 |
+| Qwen2.5-Coder-1.5B (old default) | 1.1 GB | 9.5 s | 26 | 4/10 |
+| Qwen3.5-0.8B / 2B | — | — | — | won't load (architecture newer than llama.cpp in 0.3.19) |
+| Gemma 3 1B | — | — | — | skipped: gated download needs a Hugging Face login |
+
+Only the Qwen3 models answered the trap question honestly; every other model invented a reason. The two
+fastest models (LFM2.5, Llama 3.2) are ~35% quicker to the first word but half as reliable. Qwen3-4B matched
+Qwen3-1.7B's score at 2.5× the wait, so there is no second preset. Revisit when llama-cpp-python ships wheels
+new enough for Qwen3.5 (it may be both faster and better). Small sample: 5 questions, one repo.
 
 ## Architecture & data flow
 

@@ -22,21 +22,17 @@ class ModelPreset:
     size_gb: float
 
 
+# Chosen by benchmark (PLAN.md, "Model choice"): of 9 small models, Qwen3-1.7B was as fast as the
+# previous default and the only one that said "not in the commits" instead of inventing an answer.
 MODEL_PRESETS: dict[str, ModelPreset] = {
-    "fast": ModelPreset(
-        label="Fast — Qwen2.5-Coder 1.5B (1.1 GB)",
-        repo_id="Qwen/Qwen2.5-Coder-1.5B-Instruct-GGUF",
-        filename="qwen2.5-coder-1.5b-instruct-q4_k_m.gguf",
-        size_gb=1.12,
-    ),
-    "better": ModelPreset(
-        label="Better answers — Qwen2.5-Coder 3B (2.1 GB, slower)",
-        repo_id="Qwen/Qwen2.5-Coder-3B-Instruct-GGUF",
-        filename="qwen2.5-coder-3b-instruct-q4_k_m.gguf",
-        size_gb=2.1,
+    "qwen3-1.7b": ModelPreset(
+        label="Qwen3 1.7B — recommended (1.1 GB)",
+        repo_id="unsloth/Qwen3-1.7B-GGUF",
+        filename="Qwen3-1.7B-Q4_K_M.gguf",
+        size_gb=1.11,
     ),
 }
-DEFAULT_PRESET = "fast"
+DEFAULT_PRESET = "qwen3-1.7b"
 
 
 # --- LLM runtime -------------------------------------------------------------
