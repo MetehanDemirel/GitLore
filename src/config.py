@@ -6,13 +6,32 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "0.1.0"  # keep in sync with CHANGELOG.md
+VERSION = "0.2.0"  # keep in sync with CHANGELOG.md
 
 # --- Paths -------------------------------------------------------------------
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT_DIR / "data"
 MODELS_DIR = DATA_DIR / "models"
 CHROMA_DIR = DATA_DIR / "chroma"
+DB_PATH = DATA_DIR / "gitlore.db"          # projects, chats, settings (SQLite)
+DEMO_DIR = DATA_DIR / "demo"               # the built-in demo repository is generated here
+VENDOR_DIR = DATA_DIR / "vendor"           # Monaco editor, downloaded on first launch
+WEB_DIR = ROOT_DIR / "web"                 # the browser UI (static files, no build step)
+
+# --- Web server ----------------------------------------------------------------
+HOST = "127.0.0.1"                         # only reachable from this computer
+PORT = 8501
+
+# --- UI --------------------------------------------------------------------------
+LANGUAGES = {"en": "English", "tr": "Türkçe", "fr": "Français", "de": "Deutsch"}
+DEFAULT_LANGUAGE = "en"
+THEMES = ("system", "light", "dark")
+
+# Monaco (VS Code's editor). Pinned and integrity-checked; only package/min/vs is kept (~26 MB).
+# The AMD build is deprecated upstream: upgrading past 0.57 means moving to its ESM build.
+MONACO_VERSION = "0.57.0"
+MONACO_TARBALL = f"https://registry.npmjs.org/monaco-editor/-/monaco-editor-{MONACO_VERSION}.tgz"
+MONACO_INTEGRITY = "sha512-5BkI9KGoqrNvBGUe15/QlZq3OooZ8WLg1AxTpaqHRCP3HNpzPPZKE2EDz8M7c+VRmCeUw1Brp4cx/PWm3kI/5A=="
 
 
 # --- Models ------------------------------------------------------------------
@@ -75,3 +94,4 @@ TOP_K = 5
 
 # --- App lifecycle -----------------------------------------------------------
 IDLE_SHUTDOWN_SECONDS = 30  # exit after the last browser tab has been closed this long
+HEARTBEAT_SECONDS = 10      # how often an open tab pings the server

@@ -148,3 +148,23 @@ def test_qwen3_models_get_the_no_think_switch():
 
     assert chat_engine.build_messages(Qwen3(), "Why?", [])[0][0]["content"].endswith("/no_think")
     assert "/no_think" not in chat_engine.build_messages(FakeLlm(), "Why?", [])[0][0]["content"]
+
+
+def test_answer_language_is_requested_for_non_english():
+    system = chat_engine.build_messages(FakeLlm(), "Neden?", [], language="tr")[0][0]["content"]
+    assert "Always answer in Turkish" in system
+    assert "Always answer in" not in chat_engine.build_messages(FakeLlm(), "Why?", [], language="en")[0][0]["content"]
+    assert "Always answer in" not in chat_engine.build_messages(FakeLlm(), "Why?", [], language="xx")[0][0]["content"]
+
+
+def test_selected_code_is_shown_before_the_question_and_budgeted():
+    focus = {"path": "auth/login.py", "commit": "a1b2c3d4e5", "text": "return issue_jwt(user)"}
+    messages, used = chat_engine.build_messages(FakeLlm(), "What does this do?", [make_commit(1)], focus=focus)
+    user = messages[-1]["content"]
+    assert "The user selected this code from auth/login.py in commit [a1b2c3d]" in user
+    assert user.index("return issue_jwt(user)") < user.index("Question: What does this do?")
+
+    huge = {"path": "x.py", "text": "z" * 50_000}
+    messages, _ = chat_engine.build_messages(FakeLlm(), "?", [make_commit(i) for i in range(20)], focus=huge)
+    assert total_tokens(FakeLlm(), messages) <= config.MAX_PROMPT_TOKENS
+    assert messages[-1]["content"].count("z") == 1200

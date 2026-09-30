@@ -153,3 +153,11 @@ def test_commit_url_base_without_remote(rb):
 
     rb.commit("init", {"a.txt": "a\n"})
     assert commit_url_base(str(rb.path)) is None
+
+
+def test_single_commit_by_revision_and_option_injection_refused(rb):
+    first = rb.commit("first", {"a.txt": "a\n"})
+    rb.commit("second", {"a.txt": "b\n"})
+    assert [c["hash"] for c in get_commits(str(rb.path), 1, rev=first)] == [first]
+    with pytest.raises(RepoError):
+        get_commits(str(rb.path), 1, rev="--output=/tmp/pwned")
