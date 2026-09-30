@@ -31,6 +31,7 @@ jobs:
       - name: Install dependencies
         shell: bash
         run: |
+          set +e  # Actions runs bash with -e -o pipefail; keep going to report the failure
           uv pip install -r requirements-dev.txt 2>&1 | tee install.log
           status=${PIPESTATUS[0]}
           [ "$status" -eq 0 ] || python .github/annotate.py "Install failed" install.log
@@ -38,6 +39,7 @@ jobs:
       - name: Run tests
         shell: bash
         run: |
+          set +e
           python -m pytest -q -rfEs --tb=short 2>&1 | tee pytest.log
           status=${PIPESTATUS[0]}
           [ "$status" -eq 0 ] || python .github/annotate.py "Tests failed" pytest.log
