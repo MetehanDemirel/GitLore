@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -73,24 +74,33 @@ def app(server, page: Page):
 
 
 def open_commit(page: Page, subject: str) -> None:
-    page.locator(".commit .subject", has_text=subject).click()
+    # Anchored: "Add CSV export" must not also match 'Revert "Add CSV export"'.
+    page.locator(".commit .subject").filter(has_text=re.compile("^" + re.escape(subject))).click()
     page.wait_for_selector(".monaco-diff-editor .view-lines", timeout=30000)
     page.wait_for_timeout(500)
 
 
-def select_line(page: Page, text: str):
-    """Select the whole line containing `text` in the right-hand editor; retries while the diff layout settles."""
-    for _ in range(10):
-        line = page.locator(".editor.modified .view-line").filter(has_text=text).first
-        box = line.bounding_box()
-        page.mouse.click(box["x"] + 30, box["y"] + box["height"] / 2)
-        page.keyboard.press("Home")
-        page.keyboard.press("Shift+End")
-        selected = page.evaluate("monaco.editor.getEditors().map(e => e.getModel().getValueInRange(e.getSelection())).join('')")
-        if text in selected and line.bounding_box() == box:
-            return box
-        page.wait_for_timeout(300)
-    raise AssertionError(f"could not select the line containing {text!r}")
+SELECT_LINE_JS = """(text) => {
+  const ed = monaco.editor.getDiffEditors()[0].getModifiedEditor();
+  const model = ed.getModel();
+  const match = model.findMatches(text, false, false, true, null, false)[0];
+  if (!match) return null;
+  const line = match.range.startLineNumber;
+  ed.focus();
+  ed.revealLineInCenter(line);
+  ed.setSelection(new monaco.Range(line, 1, line, model.getLineMaxColumn(line)));
+  const pos = ed.getScrolledVisiblePosition({ lineNumber: line, column: 2 });
+  const rect = ed.getDomNode().getBoundingClientRect();
+  return { x: rect.left + pos.left, y: rect.top + pos.top, height: pos.height };
+}"""
+
+
+def select_line(page: Page, text: str) -> dict:
+    """Select the line containing `text` in the right-hand editor (via Monaco's API, independent of layout)."""
+    box = page.evaluate(SELECT_LINE_JS, text)
+    assert box, f"no line contains {text!r}"
+    page.wait_for_timeout(200)
+    return page.evaluate(SELECT_LINE_JS, text)  # measured again after scrolling settled
 
 
 def context_menu_click(page: Page, box: dict, label: str) -> None:
@@ -99,6 +109,7 @@ def context_menu_click(page: Page, box: dict, label: str) -> None:
         item = page.locator(".monaco-menu .action-item", has_text=label).first
         try:
             item.wait_for(state="visible", timeout=2000)
+            page.wait_for_timeout(400)  # Monaco ignores clicks that land right after its menu opens
             item.hover()
             item.click()
             return
@@ -124,7 +135,6 @@ def test_commit_diff_and_message(app: Page):
     expect(app.get_by_role("button", name="Inline")).to_have_attribute("aria-pressed", "true")
 
 
-@pytest.mark.xfail(reason="Known issue (v0.2.0): flaky on a freshly started server; tracked for v0.2.1", strict=False)
 def test_right_click_explain_and_open_citation(app: Page):
     open_commit(app, "Fix overdue filter")
     box = select_line(app, "t.due < today")
@@ -180,6 +190,7 @@ def test_edit_save_and_commit(app: Page):
 
 
 def test_chats_are_saved_across_reloads(app: Page):
+    app.locator(".assistant button[aria-label='New Chat']").click()  # suggestions show in an empty chat
     app.get_by_role("button", name="Why was the CSV export reverted?").click()
     expect(app.locator(".messages .answer .cite").last).to_be_visible(timeout=30000)
     app.reload()
@@ -188,7 +199,6 @@ def test_chats_are_saved_across_reloads(app: Page):
     expect(app.locator(".msg.user .bubble").first).to_have_text("Why was the CSV export reverted?")
 
 
-@pytest.mark.xfail(reason="Known issue (v0.2.0): flaky on a freshly started server; tracked for v0.2.1", strict=False)
 def test_every_button_has_an_accessible_name(app: Page):
     open_commit(app, "Add CSV export")
     unnamed = app.evaluate("""() => [...document.querySelectorAll('button')]

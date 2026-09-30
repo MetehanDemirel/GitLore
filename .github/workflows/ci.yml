@@ -53,6 +53,34 @@ jobs:
           [ "$status" -eq 0 ] || python .github/annotate.py "Tests failed" pytest.log
           exit "$status"
 
+  browser:
+    # Drives the real UI in Chromium: demo project, diffs, right-click "Explain", edit + commit, languages.
+    name: Browser tests
+    runs-on: windows-latest   # prebuilt LLM library there, so no 5-minute compile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          activate-environment: true
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/chroma
+          key: chroma-onnx-minilm
+      - name: Install dependencies and Chromium
+        run: |
+          uv pip install -r requirements-dev.txt
+          python -m playwright install chromium
+      - name: Run browser tests
+        shell: bash
+        run: |
+          set +e
+          python -m pytest tests/e2e -q -rfEs --tb=short 2>&1 | tee pytest.log
+          status=${PIPESTATUS[0]}
+          [ "$status" -eq 0 ] || python .github/annotate.py "Browser tests failed" pytest.log
+          exit "$status"
+
   launcher:
     # Runs the real one-click launcher like a new user would, then checks the app answers HTTP.
     name: Launcher (${{ matrix.os }})

@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "0.2.0"  # keep in sync with CHANGELOG.md
+VERSION = "0.2.1"  # keep in sync with CHANGELOG.md
 
 # --- Paths -------------------------------------------------------------------
 ROOT_DIR = Path(__file__).resolve().parent.parent

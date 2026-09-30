@@ -10,7 +10,7 @@
 - **Runs on any ordinary computer** — CPU only, no GPU needed (Linux compiles one library on first install)
 - **One-click start** — double-click `start.bat` (Windows) or run `./start.sh` (macOS/Linux)
 
-> **Status: v0.2.0.** A VS Code-like workspace: commit timeline, colored diffs, right-click "Ask GitLore", edit and commit, saved projects and chats, English, Turkish, French and German, light and dark themes. See [CHANGELOG.md](CHANGELOG.md) and [PLAN.md](PLAN.md).
+> **Status: v0.2.1.** A VS Code-like workspace: commit timeline, colored diffs, right-click "Ask GitLore", edit and commit, saved projects and chats, English, Turkish, French and German, light and dark themes. See [CHANGELOG.md](CHANGELOG.md) and [PLAN.md](PLAN.md).
 
 ## Quick start
 

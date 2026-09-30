@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.1] — 2026-09-30
+
+Supersedes 0.2.0: the same workspace, now fully verified.
+
+### Fixed
+- Browser tests are no longer marked "known-flaky": both failures were in the tests, not the app.
+  Monaco's context menu deliberately ignores a click that lands right after it opens (so the
+  right-click release can't trigger an item); the tests now pause like a person would, select code
+  through Monaco's API instead of by mouse position, and match commit titles exactly.
+- CI runs the browser tests (Chromium) on every push, alongside the Windows/macOS/Linux tests and
+  launcher checks.
+
 ## [0.2.0] — 2026-09-30
 
 GitLore is now a small **VS Code-like workspace for Git history**, with a built-in demo project to try
@@ -25,8 +37,6 @@ launch downloads the code editor (Monaco, ~19 MB, one time). Your downloaded mod
 ### Known limitations
 - Answers take ~10–25 s to start on a laptop CPU. Turkish answers from the small model are understandable
   but sometimes use an awkward word.
-- Two browser tests are marked as known-flaky (right-click → explain on a freshly started server, and an
-  accessibility check); the features work in manual testing. Tracked for 0.2.1.
 
 ## [0.1.0] — 2026-09-30
 
