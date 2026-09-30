@@ -99,7 +99,9 @@ GitLore/
 2. **Git parser** ✅ — `get_commits()` via one streamed `git log -p -U0 --diff-merges=first-parent`; diffs truncated
    while streaming; lock/generated files listed but diff skipped; friendly `RepoError`s. 15 tests on real temp repos.
    Benchmark (psf/requests): 2,000 commits in 0.8 s, 5 MB peak memory.
-3. **Vector store** — `index_commits()` (incremental), `search()`; tests with an ephemeral client.
+3. **Vector store** ✅ — `index_commits()` (incremental, batched, progress callback), `search()` (semantic + exact
+   commit-hash matching), `count()`, `reset()`; telemetry disabled; cosine distance; 8 tests.
+   Benchmark (psf/requests, i5-11400H): index ~28 commits/s (2,000 in ~70 s), re-check 0.1 s, search ~0.3 s.
 4. **Model manager** — download with progress, load, presets; smoke test generates a few tokens.
 5. **Chat engine** — prompt assembly with token budget, streaming generator.
 6. **UI** — sidebar (repo path, commit count, model preset, Index button, status), chat, citations expander.
