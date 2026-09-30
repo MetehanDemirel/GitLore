@@ -39,7 +39,7 @@ jobs:
           set +e  # Actions runs bash with -e -o pipefail; keep going to report the failure
           extra=()
           # Same as start.sh: the prebuilt Linux wheel is musl-only, so build llama-cpp-python from source.
-          [ "$RUNNER_OS" = "Linux" ] && extra=(--no-binary-package llama-cpp-python --index-strategy unsafe-best-match)
+          [ "$RUNNER_OS" = "Linux" ] && extra=(--no-binary llama-cpp-python --index-strategy unsafe-best-match)
           uv pip install "${extra[@]}" -r requirements-dev.txt 2>&1 | tee install.log
           status=${PIPESTATUS[0]}
           [ "$status" -eq 0 ] || python .github/annotate.py "Install failed" install.log

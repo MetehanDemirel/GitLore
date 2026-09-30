@@ -34,7 +34,7 @@ if ! cmp -s requirements.txt .venv/requirements.stamp; then
         command -v c++ >/dev/null || command -v g++ >/dev/null || command -v clang++ >/dev/null \
             || fail "A C++ compiler is needed on Linux. Ubuntu/Debian: sudo apt install build-essential  Fedora: sudo dnf install gcc-c++"
         echo "[GitLore] Linux: compiling the LLM library from source (one time, about 5 minutes)..."
-        UV_EXTRA=(--no-binary-package llama-cpp-python --index-strategy unsafe-best-match)
+        UV_EXTRA=(--no-binary llama-cpp-python --index-strategy unsafe-best-match)
         PIP_EXTRA=(--no-binary llama-cpp-python)
     fi
     echo "[GitLore] Installing dependencies (first run takes a few minutes)..."

@@ -42,7 +42,7 @@ streamlit run app.py
 **Linux only:** the prebuilt LLM library works only on Alpine, so compile it (needs a C++ compiler, e.g.
 `sudo apt install build-essential`; takes about 5 minutes once):
 ```bash
-uv pip install --no-binary-package llama-cpp-python --index-strategy unsafe-best-match -r requirements.txt
+uv pip install --no-binary llama-cpp-python --index-strategy unsafe-best-match -r requirements.txt
 ```
 
 ## Alternative: plain pip
