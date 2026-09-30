@@ -13,8 +13,8 @@
     // Apply the saved theme before first paint, so the page never flashes the wrong colors.
     try {
       const t = localStorage.getItem("gitlore.theme") || "system";
-      const dark = t === "dark" || (t === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
-      document.documentElement.dataset.theme = dark ? "dark" : "light";
+      document.documentElement.dataset.theme = t !== "system" ? t
+        : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     } catch (e) {}
   </script>
 </head>

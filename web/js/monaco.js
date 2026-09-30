@@ -17,40 +17,44 @@ export function loadMonaco(basePath, lang) {
   if (loading) return loading;
   loading = (async () => {
     // Monaco's translations are plain scripts that set globals; they must run before the editor loads.
-    if (lang !== "en") await addScript(`${basePath}/nls/lang/${lang}.js`).catch(() => {});
+    const nls = { zh: "zh-cn" }[lang] || lang;  // Monaco names Simplified Chinese "zh-cn"
+    if (lang !== "en") await addScript(`${basePath}/nls/lang/${nls}.js`).catch(() => {});
     await addScript(`${basePath}/loader.js`);
     window.require.config({ paths: { vs: basePath } });
     await new Promise((resolve, reject) => window.require(["vs/editor/editor.main"], resolve, reject));
-    defineThemes(window.monaco);
     return window.monaco;
   })();
   return loading;
 }
 
-function defineThemes(monaco) {
-  monaco.editor.defineTheme("gitlore-light", {
-    base: "vs", inherit: true, rules: [],
-    colors: {
-      "editor.background": "#FFFFFF", "editorGutter.background": "#FFFFFF",
-      "editor.lineHighlightBackground": "#F4F6F5", "editorLineNumber.foreground": "#9AA39F",
-      "editor.selectionBackground": "#BFE3DC", "focusBorder": "#2A7A6F",
-      "diffEditor.insertedTextBackground": "#1A7F3726", "diffEditor.removedTextBackground": "#CF222E26",
-      "diffEditor.insertedLineBackground": "#1A7F3714", "diffEditor.removedLineBackground": "#CF222E14",
-    },
-  });
-  monaco.editor.defineTheme("gitlore-dark", {
-    base: "vs-dark", inherit: true, rules: [],
-    colors: {
-      "editor.background": "#1B2021", "editorGutter.background": "#1B2021",
-      "editor.lineHighlightBackground": "#22282A", "editorLineNumber.foreground": "#5E6864",
-      "editor.selectionBackground": "#2E5A53", "focusBorder": "#5CC2B2",
-      "diffEditor.insertedTextBackground": "#3FB95033", "diffEditor.removedTextBackground": "#F8514933",
-      "diffEditor.insertedLineBackground": "#3FB9501A", "diffEditor.removedLineBackground": "#F851491A",
-    },
-  });
-}
+const DARK = new Set(["dark", "dim", "solarized-dark", "contrast-dark"]);
+const defined = new Set();
 
-export const monacoTheme = (theme) => (theme === "dark" ? "gitlore-dark" : "gitlore-light");
+/**
+ * Monaco theme built from the app's CSS variables, so every GitLore theme (styles.css) has a matching
+ * editor theme without keeping two color lists in sync. Call after data-theme is set on <html>.
+ */
+export function monacoTheme(theme) {
+  const name = `gitlore-${theme}`;
+  const monaco = window.monaco;
+  if (!monaco || defined.has(name)) return name;
+  const css = getComputedStyle(document.documentElement);
+  const v = (k) => css.getPropertyValue(k).trim();
+  const contrast = theme.startsWith("contrast-");
+  monaco.editor.defineTheme(name, {
+    base: contrast ? (DARK.has(theme) ? "hc-black" : "hc-light") : DARK.has(theme) ? "vs-dark" : "vs",
+    inherit: true, rules: [],
+    colors: {
+      "editor.background": v("--panel"), "editorGutter.background": v("--panel"),
+      "editor.lineHighlightBackground": v("--raised"), "editorLineNumber.foreground": v("--muted"),
+      "editor.selectionBackground": v("--accent-soft"), "focusBorder": v("--accent"),
+      "diffEditor.insertedTextBackground": v("--add") + "33", "diffEditor.removedTextBackground": v("--del") + "33",
+      "diffEditor.insertedLineBackground": v("--add") + "18", "diffEditor.removedLineBackground": v("--del") + "18",
+    },
+  });
+  defined.add(name);
+  return name;
+}
 
 /**
  * Side-by-side (or inline) diff. Left = before, right = after.
@@ -105,9 +109,46 @@ export function DiffView({ monaco, original, modified, language, editable = fals
                      contextMenuOrder: 0.1, precondition: "editorHasSelection", run: run(true) });
     }
     diff.getModifiedEditor().addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => handlers.current.onSave?.());
+
+    // A small "Explain" button at the end of each changed block — no right-click needed.
+    let widgets = [];
+    const clearWidgets = () => { widgets.forEach(([ed, w]) => ed.removeContentWidget(w)); widgets = []; };
+    const placeWidgets = () => {
+      clearWidgets();
+      if (editable || !handlers.current.onAsk) return;
+      (diff.getLineChanges() || []).slice(0, 40).forEach((ch, i) => {
+        const added = ch.modifiedEndLineNumber >= ch.modifiedStartLineNumber && ch.modifiedEndLineNumber > 0;
+        const ed = added ? diff.getModifiedEditor() : diff.getOriginalEditor();
+        const [from, to] = added ? [ch.modifiedStartLineNumber, ch.modifiedEndLineNumber]
+                                 : [ch.originalStartLineNumber, ch.originalEndLineNumber];
+        const model = ed.getModel();
+        if (!model || from < 1 || from > model.getLineCount()) return;
+        const node = document.createElement("button");
+        node.type = "button";
+        node.className = "hunk-explain";
+        node.textContent = t("explain.change");
+        node.title = t("explain.changeHint");
+        node.onmousedown = (e) => e.stopPropagation();
+        node.onclick = (e) => {
+          e.stopPropagation();
+          const text = model.getValueInRange(new monaco.Range(from, 1, to, model.getLineMaxColumn(to)));
+          handlers.current.onAsk?.({ text, side: added ? "modified" : "original" }, "change");
+        };
+        const widget = {
+          getId: () => `gitlore.explain.${i}`, getDomNode: () => node,
+          getPosition: () => ({ position: { lineNumber: from, column: model.getLineMaxColumn(from) },
+                                preference: [monaco.editor.ContentWidgetPositionPreference.EXACT] }),
+        };
+        ed.addContentWidget(widget);
+        widgets.push([ed, widget]);
+      });
+    };
+    const diffSub = diff.onDidUpdateDiff(placeWidgets);
     applyModel();
     return () => {
       const model = diff.getModel();
+      diffSub.dispose();
+      clearWidgets();
       changeSub.current?.dispose();
       diff.dispose();
       editor.current = null;
@@ -119,7 +160,8 @@ export function DiffView({ monaco, original, modified, language, editable = fals
   useEffect(applyModel, [original, modified, language]);
 
   useEffect(() => { editor.current.updateOptions({ renderSideBySide: sideBySide }); }, [sideBySide]);
-  useEffect(() => { monaco.editor.setTheme(monacoTheme(theme)); }, [theme]);
+  // One frame later: the app sets data-theme in its own (parent) effect, which runs after this one.
+  useEffect(() => { requestAnimationFrame(() => monaco.editor.setTheme(monacoTheme(theme))); }, [theme]);
 
   return html`<div class="monaco-host" ref=${host}></div>`;
 }

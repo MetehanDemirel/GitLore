@@ -24,13 +24,16 @@ from starlette.responses import FileResponse, JSONResponse, Response, StreamingR
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from src import chat_engine, config, demo, git_ops, model_manager, store, vector_store, vendor
+from src import chat_engine, config, demo, git_ops, insights, model_manager, narratives, online, store, vector_store, vendor
 from src.config import ModelPreset
 from src.git_ops import GitOpError
 from src.git_parser import RepoError, get_commits, open_repo
 from src.model_manager import ModelError
 
 DEFAULT_CHAT_TITLE = "New Chat"
+DEMO_INDEX_COUNT = 500      # the whole demo history
+READ_ONLY = ("Online projects are read-only copies that stay in sync with GitHub. Clone the repository "
+             "yourself and add the folder as a project to edit it.")
 
 
 # =========================================================================== background jobs
@@ -100,6 +103,28 @@ class Models:
 
 
 MODELS = Models()
+
+
+class LockedLlm:
+    """Wraps the model so every request takes the lock only while it generates."""
+
+    def __init__(self, llm) -> None:
+        self._llm = llm
+        self.metadata = getattr(llm, "metadata", {})
+
+    def tokenize(self, *args, **kwargs):
+        return self._llm.tokenize(*args, **kwargs)
+
+    def detokenize(self, *args, **kwargs):
+        return self._llm.detokenize(*args, **kwargs)
+
+    def create_chat_completion(self, **kwargs):
+        with MODELS.lock:
+            yield from self._llm.create_chat_completion(**kwargs)
+
+
+def model_available() -> bool:
+    return model_manager.is_downloaded(current_preset()) or bool(os.environ.get("GITLORE_FAKE_LLM"))
 
 
 def _fake_llm():
@@ -176,8 +201,9 @@ def project_view(p: dict) -> dict:
     except RepoError:
         indexed, available = 0, False
     job = next((j for j in JOBS.running() if j["key"] == f"index:{p['id']}"), None)
+    fetch_job = next((j for j in JOBS.running() if j["key"] == f"fetch:{p['id']}"), None)
     return {**p, "is_demo": bool(p["is_demo"]), "indexed": indexed, "available": available,
-            "index_job": job and job["id"]}
+            "index_job": job and job["id"], "online": bool(p.get("remote_url")), "fetch_job": fetch_job and fetch_job["id"]}
 
 
 def _commit_summary(c: dict) -> dict:
@@ -198,11 +224,19 @@ def _index_job(progress, project_id: int, max_commits: int, rebuild: bool = Fals
 
 
 def ensure_demo_project() -> dict:
-    """The built-in demo project is always present; created and indexed on first launch."""
+    """The built-in demo project is always present; created (or upgraded) and indexed on first launch."""
     path = str(demo.ensure_demo())
+    existing = next((p for p in store.list_projects() if p["is_demo"]), None)
+    if existing and existing["path"] != path:  # upgraded demo: new folder, new commits
+        try:
+            vector_store.reset(existing["path"])
+        except RepoError:
+            pass  # the old folder may already be gone
+        store.set_project_path(existing["id"], path)
+        store.delete_briefs(existing["id"])
     project = store.find_project_by_path(path) or store.add_project(demo.NAME, path, is_demo=True)
     if vector_store.count(path) == 0:
-        JOBS.start("index", f"index:{project['id']}", _index_job, project["id"], config.DEFAULT_COMMIT_COUNT)
+        JOBS.start("index", f"index:{project['id']}", _index_job, project["id"], DEMO_INDEX_COUNT)
     return project
 
 
@@ -372,8 +406,13 @@ def _git(fn, *args):
 async def commits(request: Request) -> Response:
     project = project_or_404(request.path_params["pid"])
     q = request.query_params
-    return _git(git_ops.list_commits, project["path"], q.get("q", ""), min(int(q.get("limit", 200)), 1000),
-                int(q.get("offset", 0)))
+
+    def listing():
+        rows = git_ops.list_commits(project["path"], q.get("q", ""), min(int(q.get("limit", 200)), 5000),
+                                    int(q.get("offset", 0)))
+        cats = insights.commit_categories(project["path"])
+        return [{**r, **cats.get(r["hash"], {"category": "chore", "large": False})} for r in rows]
+    return _git(listing)
 
 
 async def commit_detail(request: Request) -> Response:
@@ -402,6 +441,8 @@ async def worktree_file(request: Request) -> Response:
     if request.method == "GET":
         return _git(git_ops.read_file, project["path"], request.query_params.get("path", ""))
     data = await body(request)
+    if project.get("remote_url"):
+        return fail(READ_ONLY)
     if not isinstance(data.get("content"), str):
         return fail("Missing file content.")
     return _git(lambda: git_ops.write_file(project["path"], str(data.get("path", "")), data["content"]) or {"ok": True})
@@ -410,6 +451,8 @@ async def worktree_file(request: Request) -> Response:
 async def make_commit(request: Request) -> Response:
     project = project_or_404(request.path_params["pid"])
     data = await body(request)
+    if project.get("remote_url"):
+        return fail(READ_ONLY)
     paths = data.get("paths")
     if not isinstance(paths, list) or not all(isinstance(p, str) for p in paths):
         return fail("Choose at least one changed file to commit.")
@@ -475,7 +518,13 @@ def _answer_stream(c: dict, project: dict, question: str, focus: dict | None) ->
                 except (RepoError, GitOpError):
                     focused = []
             candidates = chat_engine.candidate_commits([*focused, *hits], previous, follow_up)
-            messages, used_full = chat_engine.build_messages(llm, question, candidates, turns, language, focus)
+            # Dig for *why*: the commits a revert undid, and other commits about the same issue.
+            related = []
+            for h in insights.related(project["path"], [x["hash"] for x in candidates[:3]]):
+                related += get_commits(project["path"], 1, rev=h)
+            candidates = chat_engine.candidate_commits([*candidates[:3], *related, *candidates[3:]], [], False)
+            notes = _discussion_notes(project, candidates[:1])
+            messages, used_full = chat_engine.build_messages(llm, question, candidates, turns, language, focus, notes)
             used = [_commit_summary(x) for x in used_full]
             store.update_message(reply_id, commits=used)
             yield _sse({"type": "commits", "commits": used})
@@ -495,6 +544,24 @@ def _answer_stream(c: dict, project: dict, question: str, focus: dict | None) ->
         store.update_message(reply_id, content=text)  # keeps a stopped answer's words
 
 
+def _discussion_notes(project: dict, commits: list[dict]) -> str:
+    """For online projects: the pull request / issue discussion behind the top commit (cached)."""
+    ident = online.owner_repo(project)
+    if not ident or not commits:
+        return ""
+    try:
+        items = online.discussions(*ident, commits[0]["hash"], commits[0]["message"])
+    except online.OnlineError:
+        return ""
+    parts = []
+    for d in items[:2]:
+        text = f"GitHub {d['kind']} #{d['number']} \"{d['title']}\": {d['body'][:500]}"
+        for c in d.get("top_comments", [])[:2]:
+            text += f"\n  Comment by {c['author']}: {c['body'][:200]}"
+        parts.append(text)
+    return "\n".join(parts)
+
+
 async def ask(request: Request) -> Response:
     c = chat_or_404(request.path_params["cid"])
     project = project_or_404(c["project_id"])
@@ -509,6 +576,181 @@ async def ask(request: Request) -> Response:
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
+# =========================================================================== routes: insights (no AI)
+_INSIGHTS = {
+    "overview": insights.overview, "heatmap": insights.heatmap, "activity": insights.activity,
+    "contributors": insights.contributors, "hot-files": insights.hot_files, "releases": insights.releases,
+    "branches": insights.branches,
+}
+
+
+async def insight(request: Request) -> Response:
+    project = project_or_404(request.path_params["pid"])
+    fn = _INSIGHTS.get(request.path_params["name"])
+    if not fn:
+        return fail("Unknown insight.", 404)
+    return _git(fn, project["path"])
+
+
+async def profile(request: Request) -> Response:
+    project = project_or_404(request.path_params["pid"])
+    return _git(insights.profile, project["path"], request.query_params.get("author", ""))
+
+
+async def compare(request: Request) -> Response:
+    project = project_or_404(request.path_params["pid"])
+    q = request.query_params
+    return _git(insights.compare, project["path"], q.get("base", ""), q.get("head", ""))
+
+
+async def search(request: Request) -> Response:
+    project = project_or_404(request.path_params["pid"])
+    return _git(insights.search, project["path"], request.query_params.get("q", "")[:500])
+
+
+async def blame(request: Request) -> Response:
+    project = project_or_404(request.path_params["pid"])
+    return _git(insights.blame, project["path"], request.query_params.get("path", ""))
+
+
+async def visit(request: Request) -> Response:
+    """Record a visit; returns the previous one (for "what changed since my last visit?")."""
+    project = project_or_404(request.path_params["pid"])
+    previous = project.get("last_visit")
+    store.set_last_visit(project["id"], time.strftime("%Y-%m-%dT%H:%M:%S%z"))
+    return ok({"previous": previous})
+
+
+# =========================================================================== routes: AI narratives
+_BRIEF_KINDS = {"history", "timeline", "away", "onboarding"}
+
+
+def _brief_key(kind: str, since: str | None) -> str:
+    return (since or "")[:10] if kind == "away" else "all"
+
+
+def _brief_facts(kind: str, path: str, since: str | None) -> dict:
+    if kind == "history":
+        return {"eras": [{k: v for k, v in e.items() if k != "commits"} for e in reversed(narratives.eras(path))]}
+    if kind == "timeline":
+        return {"events": narratives.events(path)}
+    if kind == "away":
+        return narratives.away_facts(path, since)
+    return narratives.onboarding_facts(path)
+
+
+def _brief_job(progress, project_id: int, kind: str, since: str | None) -> dict:
+    project = store.get_project(project_id)
+    path = project["path"]
+    language = store.get_setting("language", config.DEFAULT_LANGUAGE)
+    llm = LockedLlm(MODELS.get(current_preset())) if model_available() else None
+    report = lambda done, total, label="": progress(done, total, label)  # noqa: E731
+    if kind == "history":
+        result = narratives.repository_history(path, llm, language, report)
+    elif kind == "timeline":
+        result = narratives.timeline(path, llm, language, report)
+    elif kind == "away":
+        result = narratives.away(path, since, llm, language, report)
+    else:
+        result = narratives.onboarding(path, llm, language, report)
+    head = open_repo(path).head.commit.hexsha
+    store.put_brief(project_id, kind, _brief_key(kind, since), head, language, result)
+    return {"ok": True}
+
+
+async def brief(request: Request) -> Response:
+    project = project_or_404(request.path_params["pid"])
+    kind = request.path_params["kind"]
+    if kind not in _BRIEF_KINDS:
+        return fail("Unknown brief.", 404)
+    since = request.query_params.get("since") or (narratives.default_since(project.get("last_visit"))
+                                                   if kind == "away" else None)
+    if request.method == "POST":
+        if not model_available():
+            return fail("The AI model isn't downloaded yet. Download it in Settings first.")
+        job = JOBS.start("brief", f"brief:{project['id']}:{kind}", _brief_job, project["id"], kind, since)
+        return ok({"job": job["id"]})
+    try:
+        cached = store.get_brief(project["id"], kind, _brief_key(kind, since))
+        head = open_repo(project["path"]).head.commit.hexsha
+        facts = _brief_facts(kind, project["path"], since)
+    except (RepoError, GitOpError) as e:
+        return fail(str(e))
+    language = store.get_setting("language", config.DEFAULT_LANGUAGE)
+    job = next((j for j in JOBS.running() if j["key"] == f"brief:{project['id']}:{kind}"), None)
+    return ok({"kind": kind, "since": since, "facts": facts, "job": job and job["id"],
+               "brief": cached and cached["content"], "created_at": cached and cached["created_at"],
+               "stale": bool(cached and (cached["head"] != head or cached["language"] != language))})
+
+
+# =========================================================================== routes: online mode
+def _online_job(progress, url: str, depth: int) -> dict:
+    owner, repo = online.parse_repo(url)
+    path = online.clone(owner, repo, depth, lambda d, t, stage: progress(d, t, stage))
+    project = store.add_project(f"{owner}/{repo}", str(path.resolve()), remote_url=f"https://github.com/{owner}/{repo}")
+    store.set_setting("last_project", str(project["id"]))
+    progress(0, 0, "indexing")
+    _index_job(progress, project["id"], min(depth, int(store.get_setting("commit_count", "500"))))
+    return {"project": project["id"]}
+
+
+async def add_online_project(request: Request) -> Response:
+    data = await body(request)
+    try:
+        owner, repo = online.parse_repo(str(data.get("url", "")))
+    except online.OnlineError as e:
+        return fail(str(e))
+    depth = int(data.get("depth") or online.DEFAULT_DEPTH)
+    if not 10 <= depth <= 100_000:
+        return fail("History depth must be between 10 and 100,000 commits.")
+    job = JOBS.start("online", f"online:{owner}/{repo}".lower(), _online_job, f"{owner}/{repo}", depth)
+    return ok({"job": job["id"]}, 202)
+
+
+def _fetch_job(progress, project_id: int) -> dict:
+    project = store.get_project(project_id)
+    progress(0, 0, "fetching")
+    result = online.fetch(project["path"], online.DEFAULT_DEPTH)
+    if result["updated"]:
+        _index_job(progress, project_id, int(store.get_setting("commit_count", "500")))
+    return result
+
+
+async def fetch_project(request: Request) -> Response:
+    project = project_or_404(request.path_params["pid"])
+    if not project.get("remote_url"):
+        return fail("Only online projects can be updated from GitHub.")
+    job = JOBS.start("fetch", f"fetch:{project['id']}", _fetch_job, project["id"])
+    return ok({"job": job["id"]})
+
+
+def _online_call(project: dict, fn, *args):
+    ident = online.owner_repo(project)
+    if not ident:
+        return fail("This project isn't linked to GitHub.")
+    try:
+        return ok(fn(*ident, *args))
+    except online.OnlineError as e:
+        return fail(str(e), 503)
+
+
+async def online_info(request: Request) -> Response:
+    return _online_call(project_or_404(request.path_params["pid"]), online.repo_info)
+
+
+async def online_releases(request: Request) -> Response:
+    return _online_call(project_or_404(request.path_params["pid"]), online.releases)
+
+
+async def online_discussions(request: Request) -> Response:
+    project = project_or_404(request.path_params["pid"])
+    try:
+        detail = git_ops.commit_detail(project["path"], request.path_params["sha"])
+    except (RepoError, GitOpError) as e:
+        return fail(str(e))
+    return _online_call(project, online.discussions, detail["hash"], detail["message"])
+
+
 # =========================================================================== app
 async def index_page(request: Request) -> Response:
     return FileResponse(config.WEB_DIR / "index.html", headers={"Cache-Control": "no-cache"})
@@ -521,7 +763,10 @@ def _http_error(request: Request, exc: HTTPException) -> Response:
 def create_app(setup: bool = True, extra_hosts: tuple[str, ...] = ()) -> Starlette:
     """Build the app. `setup` creates the demo project and fetches the editor; tests add their host name."""
     if setup:
-        ensure_demo_project()
+        try:
+            ensure_demo_project()
+        except Exception as e:  # never let the demo stop GitLore from starting
+            print(f"[GitLore] Couldn't prepare the demo project: {type(e).__name__}: {e}", flush=True)
         ensure_editor()
     routes = [
         Route("/", index_page),
@@ -548,6 +793,18 @@ def create_app(setup: bool = True, extra_hosts: tuple[str, ...] = ()) -> Starlet
         Route("/api/chats/{cid:int}", chat, methods=["PATCH", "DELETE"]),
         Route("/api/chats/{cid:int}/messages", chat_messages),
         Route("/api/chats/{cid:int}/ask", ask, methods=["POST"]),
+        Route("/api/projects/{pid:int}/insights/{name}", insight),
+        Route("/api/projects/{pid:int}/profile", profile),
+        Route("/api/projects/{pid:int}/compare", compare),
+        Route("/api/projects/{pid:int}/search", search),
+        Route("/api/projects/{pid:int}/blame", blame),
+        Route("/api/projects/{pid:int}/visit", visit, methods=["POST"]),
+        Route("/api/projects/{pid:int}/briefs/{kind}", brief, methods=["GET", "POST"]),
+        Route("/api/online/projects", add_online_project, methods=["POST"]),
+        Route("/api/projects/{pid:int}/fetch", fetch_project, methods=["POST"]),
+        Route("/api/projects/{pid:int}/online/info", online_info),
+        Route("/api/projects/{pid:int}/online/releases", online_releases),
+        Route("/api/projects/{pid:int}/online/discussions/{sha}", online_discussions),
         Mount("/static", StaticFiles(directory=config.WEB_DIR), name="static"),
         Mount("/monaco", StaticFiles(directory=config.VENDOR_DIR, check_dir=False), name="monaco"),
     ]

@@ -43,7 +43,29 @@ CREATE TABLE IF NOT EXISTS messages (
     created_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS briefs (                 -- cached AI narratives (history, timeline, ...)
+    project_id INTEGER NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    kind       TEXT NOT NULL,
+    key        TEXT NOT NULL,
+    head       TEXT NOT NULL,                     -- repository HEAD the brief was written for
+    language   TEXT NOT NULL,
+    content    TEXT NOT NULL,                     -- JSON
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (project_id, kind, key)
+);
+CREATE TABLE IF NOT EXISTS http_cache (             -- GitHub API responses (online mode), with ETags
+    url        TEXT PRIMARY KEY,
+    etag       TEXT,
+    body       TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+);
 """
+
+# Columns added after 0.2; existing databases get them on first use.
+_MIGRATIONS = [
+    ("projects", "remote_url", "TEXT"),     # online projects: where it was cloned from
+    ("projects", "last_visit", "TEXT"),     # for "what changed since my last visit?"
+]
 
 
 # Timestamps have one-second resolution, so ordering uses this ever-increasing counter instead.
@@ -62,6 +84,9 @@ def _db() -> Iterator[sqlite3.Connection]:
     conn.execute("PRAGMA foreign_keys = ON")
     try:
         conn.executescript(_SCHEMA)
+        for table, column, kind in _MIGRATIONS:
+            if column not in {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {kind}")
         yield conn
         conn.commit()
     finally:
@@ -102,7 +127,7 @@ def find_project_by_path(path: str) -> dict | None:
         return _row(db.execute("SELECT * FROM projects WHERE path = ?", (path,)).fetchone())
 
 
-def add_project(name: str, path: str, is_demo: bool = False) -> dict:
+def add_project(name: str, path: str, is_demo: bool = False, remote_url: str | None = None) -> dict:
     """Add a project, or return the existing one for the same path."""
     existing = find_project_by_path(path)
     if existing:
@@ -110,8 +135,8 @@ def add_project(name: str, path: str, is_demo: bool = False) -> dict:
     now = _now()
     with _db() as db:
         cur = db.execute(
-            "INSERT INTO projects (name, path, is_demo, created_at, last_opened_at) VALUES (?, ?, ?, ?, ?)",
-            (name, path, int(is_demo), now, now),
+            "INSERT INTO projects (name, path, is_demo, created_at, last_opened_at, remote_url) VALUES (?, ?, ?, ?, ?, ?)",
+            (name, path, int(is_demo), now, now, remote_url),
         )
         project_id = cur.lastrowid
     return get_project(project_id)
@@ -126,6 +151,16 @@ def rename_project(project_id: int, name: str) -> dict | None:
 def touch_project(project_id: int) -> None:
     with _db() as db:
         db.execute("UPDATE projects SET last_opened_at = ? WHERE id = ?", (_now(), project_id))
+
+
+def set_project_path(project_id: int, path: str) -> None:
+    with _db() as db:
+        db.execute("UPDATE projects SET path = ? WHERE id = ?", (path, project_id))
+
+
+def set_last_visit(project_id: int, when: str) -> None:
+    with _db() as db:
+        db.execute("UPDATE projects SET last_visit = ? WHERE id = ?", (when, project_id))
 
 
 def delete_project(project_id: int) -> None:
@@ -209,3 +244,40 @@ def update_message(message_id: int, **fields: Any) -> None:
         return
     with _db() as db:
         db.execute(f"UPDATE messages SET {', '.join(sets)} WHERE id = ?", (*values, message_id))
+
+
+# --------------------------------------------------------------------------- cached AI narratives
+def get_brief(project_id: int, kind: str, key: str) -> dict | None:
+    with _db() as db:
+        row = db.execute("SELECT * FROM briefs WHERE project_id = ? AND kind = ? AND key = ?",
+                         (project_id, kind, key)).fetchone()
+    if not row:
+        return None
+    return {**dict(row), "content": json.loads(row["content"])}
+
+
+def put_brief(project_id: int, kind: str, key: str, head: str, language: str, content: dict) -> None:
+    with _db() as db:
+        db.execute("INSERT INTO briefs (project_id, kind, key, head, language, content, created_at) "
+                   "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(project_id, kind, key) DO UPDATE SET "
+                   "head = excluded.head, language = excluded.language, content = excluded.content, "
+                   "created_at = excluded.created_at",
+                   (project_id, kind, key, head, language, json.dumps(content), _now()))
+
+
+def delete_briefs(project_id: int) -> None:
+    with _db() as db:
+        db.execute("DELETE FROM briefs WHERE project_id = ?", (project_id,))
+
+
+# --------------------------------------------------------------------------- HTTP cache (online mode)
+def get_http(url: str) -> dict | None:
+    with _db() as db:
+        return _row(db.execute("SELECT * FROM http_cache WHERE url = ?", (url,)).fetchone())
+
+
+def put_http(url: str, etag: str | None, body: str) -> None:
+    with _db() as db:
+        db.execute("INSERT INTO http_cache (url, etag, body, fetched_at) VALUES (?, ?, ?, ?) "
+                   "ON CONFLICT(url) DO UPDATE SET etag = excluded.etag, body = excluded.body, "
+                   "fetched_at = excluded.fetched_at", (url, etag, body, _now()))

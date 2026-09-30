@@ -5,7 +5,8 @@ import { Icon } from "../icons.js";
 import { t, number } from "../i18n.js";
 import { useApp, ConfirmDialog, PromptDialog, Progress } from "../ui.js";
 
-const COMMIT_COUNTS = [100, 200, 500, 1000, 2000];
+const COMMIT_COUNTS = [100, 200, 500, 1000, 2000, 5000];
+const THEMES = ["system", "light", "dark", "dim", "solarized-light", "solarized-dark", "sepia", "contrast-light", "contrast-dark"];
 
 export function SettingsPage() {
   const app = useApp();
@@ -52,9 +53,11 @@ export function SettingsPage() {
         <p class="hint">${t("settings.languageNote")}</p>
       </label>
       <div class="field"><span>${t("settings.theme")}</span>
-        <div class="segmented" role="group" aria-label=${t("settings.theme")} style="width:max-content">
-          ${["system", "light", "dark"].map((k) => html`<button aria-pressed=${s.theme === k} onClick=${() => app.setThemeSetting(k)}>
-            ${t("settings.theme." + k)}</button>`)}
+        <div class="theme-grid" role="radiogroup" aria-label=${t("settings.theme")}>
+          ${THEMES.map((k) => html`<button type="button" role="radio" aria-checked=${s.theme === k} class="theme-card"
+              onClick=${() => app.setThemeSetting(k)}>
+            <span class="theme-swatch" data-preview=${k === "system" ? "" : k} aria-hidden="true"><i></i><i></i><i></i></span>
+            <span>${t("settings.theme." + k)}</span></button>`)}
         </div>
       </div>
     </section>
@@ -124,6 +127,22 @@ export function SettingsPage() {
         <span class="muted">${t("project.indexed", { n: number(app.project.indexed) })}</span>
       </div>
     </section>`}
+
+    <section aria-labelledby="s-online">
+      <h2 id="s-online">${t("settings.online")}</h2>
+      <p class="muted">${t("settings.onlineNote")}</p>
+      <button class="btn" onClick=${app.showAddOnline}><${Icon} name="cloud" /> ${t("online.addTitle")}</button>
+      <p class="hint" style="margin-top:10px">${t("settings.onlineToken")}</p>
+    </section>
+
+    <section aria-labelledby="s-keys">
+      <h2 id="s-keys">${t("settings.shortcuts")}</h2>
+      <table class="table keys"><tbody>
+        ${[["Ctrl+B", "panels.toggleSidebar"], ["Ctrl+Alt+B", "nav.assistant"], ["Ctrl+K Z", "panels.zen"], ["Esc", "panels.exitZen"],
+           ["Ctrl+P", "changes.openFile"], ["Ctrl+S", "changes.save"], ["Ctrl+Enter", "changes.commit"]].map(([k, label]) =>
+          html`<tr><td><kbd>${k}</kbd></td><td>${t(label)}</td></tr>`)}
+      </tbody></table>
+    </section>
 
     <section aria-labelledby="s-about">
       <h2 id="s-about">${t("settings.about")}</h2>

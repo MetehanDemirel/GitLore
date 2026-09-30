@@ -111,9 +111,11 @@ export function ProjectSwitch() {
           onClick=${() => { setOpen(false); app.openProject(p.id); }}>
         <span class="grow" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.name}</span>
         ${p.is_demo && html`<span class="tag">${t("project.demo")}</span>`}
+        ${p.online && html`<span class="tag" title=${p.remote_url}><${Icon} name="cloud" size=${12} /></span>`}
       </button>`)}
       <hr />
       <button onClick=${() => { setOpen(false); app.showAddProject(); }}><${Icon} name="plus" /> ${t("project.add")}</button>
+      <button onClick=${() => { setOpen(false); app.showAddOnline(); }}><${Icon} name="cloud" /> ${t("project.addOnline")}</button>
     </div>`}
   </div>`;
 }

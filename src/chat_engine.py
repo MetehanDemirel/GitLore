@@ -15,6 +15,8 @@ SYSTEM_PROMPT = (
     "You are GitLore, an assistant that explains the history of a Git repository. "
     "Answer the user's question using ONLY the commits provided. "
     "Cite every claim with the commit's short hash in square brackets, e.g. [a1b2c3d], and name its author. "
+    "Focus on WHY things changed, not just what: look for the reason in commit messages, the commits "
+    "a revert undid, and related commits about the same issue number. "
     "Explain *why* a change was made only when the commit message or diff shows it; "
     "never invent reasons or details that are not in the commits. "
     "If the commits don't contain the answer, say so plainly. Be concise."
@@ -23,7 +25,8 @@ SYSTEM_PROMPT = (
 Turn = tuple[str, str]  # (question, answer)
 
 # Language names as the model understands them best (in English).
-ANSWER_LANGUAGES = {"en": "English", "tr": "Turkish", "fr": "French", "de": "German"}
+ANSWER_LANGUAGES = {"en": "English", "tr": "Turkish", "fr": "French", "de": "German", "es": "Spanish",
+                    "it": "Italian", "zh": "Simplified Chinese"}
 _FOCUS_MAX_CHARS = 1200          # selected code carried into the prompt
 
 _TEMPLATE_SLACK_TOKENS = 64      # chat-template markup around each message
@@ -82,7 +85,7 @@ def format_focus(focus: dict) -> str:
 
 def build_messages(
     llm: "Llama", question: str, commits: Sequence[Commit], history: Sequence[Turn] = (),
-    language: str = "en", focus: dict | None = None,
+    language: str = "en", focus: dict | None = None, notes: str = "",
 ) -> tuple[list[dict], list[Commit]]:
     """Pack as many commits (best first) as fit the context budget.
 
@@ -107,7 +110,8 @@ def build_messages(
     focus_block = format_focus(focus) if focus and focus.get("text") else ""
     # Small models follow the instruction closest to the end best, so the answer language is repeated here.
     reminder = f"\n(Answer in {ANSWER_LANGUAGES[language]}.)" if language != "en" and language in ANSWER_LANGUAGES else ""
-    question_block = f"{focus_block}\n\nQuestion: {question.strip()}{reminder}"
+    notes_block = f"\n\nDiscussion behind these changes (from GitHub):\n{notes[:1200]}" if notes else ""
+    question_block = f"{notes_block}{focus_block}\n\nQuestion: {question.strip()}{reminder}"
     budget = (
         config.MAX_PROMPT_TOKENS
         - _TEMPLATE_SLACK_TOKENS * (len(messages) + 1)

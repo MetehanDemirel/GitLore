@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "0.2.1"  # keep in sync with CHANGELOG.md
+VERSION = "0.3.0"  # keep in sync with CHANGELOG.md
 
 # --- Paths -------------------------------------------------------------------
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -24,9 +24,11 @@ HOST = "127.0.0.1"                         # only reachable from this computer
 PORT = 8501
 
 # --- UI --------------------------------------------------------------------------
-LANGUAGES = {"en": "English", "tr": "Türkçe", "fr": "Français", "de": "Deutsch"}
+LANGUAGES = {"en": "English", "tr": "Türkçe", "fr": "Français", "de": "Deutsch", "es": "Español",
+             "it": "Italiano", "zh": "中文（简体）"}
 DEFAULT_LANGUAGE = "en"
-THEMES = ("system", "light", "dark")
+THEMES = ("system", "light", "dark", "dim", "solarized-light", "solarized-dark", "sepia", "contrast-light",
+          "contrast-dark")
 
 # Monaco (VS Code's editor). Pinned and integrity-checked; only package/min/vs is kept (~26 MB).
 # The AMD build is deprecated upstream: upgrading past 0.57 means moving to its ESM build.

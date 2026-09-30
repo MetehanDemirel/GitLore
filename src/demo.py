@@ -8,12 +8,16 @@ hashes are identical on every machine.
 
 from __future__ import annotations
 
+import os
 import shutil
+import stat
+import subprocess
+from datetime import datetime
 from pathlib import Path
 
 import git
 
-from src import config
+from src import config, demo_story
 
 NAME = "TaskFlow (demo)"
 AUTHORS = {
@@ -352,70 +356,236 @@ STEPS: list[tuple] = [
 ]
 
 
+DEMO_VERSION = "2"  # bump when the story changes; an older demo repository is rebuilt
+
+
 def repo_path() -> Path:
-    return config.DEMO_DIR / "taskflow"
+    # One folder per demo version: upgrading never has to delete a folder another program may have open.
+    return config.DEMO_DIR / f"taskflow-{DEMO_VERSION}"
+
+
+def _marker(path: Path) -> Path:
+    return path / ".git" / "gitlore-demo-version"
+
+
+def is_current() -> bool:
+    marker = _marker(repo_path())
+    return marker.is_file() and marker.read_text().strip() == DEMO_VERSION
 
 
 def ensure_demo() -> Path:
-    """Create the demo repository if it doesn't exist yet; return its path."""
+    """Create (or upgrade) the demo repository; return its path."""
     path = repo_path()
     try:
-        if git.Repo(path).head.is_valid():
+        if git.Repo(path).head.is_valid() and is_current():
             return path
     except (git.InvalidGitRepositoryError, git.NoSuchPathError):
         pass
     if path.exists():
-        shutil.rmtree(path)  # an interrupted earlier attempt
+        shutil.rmtree(path, onerror=_force_remove)  # an interrupted earlier build of this version
     _build(path)
+    for old in config.DEMO_DIR.iterdir():         # older demo versions: removed when possible
+        if old.is_dir() and old != path and old.name.startswith("taskflow"):
+            shutil.rmtree(old, ignore_errors=True)
     return path
 
 
-def _env(author: str, date: str) -> dict[str, str]:
-    name, email = AUTHORS[author]
-    return {"GIT_AUTHOR_NAME": name, "GIT_AUTHOR_EMAIL": email, "GIT_AUTHOR_DATE": date,
-            "GIT_COMMITTER_NAME": name, "GIT_COMMITTER_EMAIL": email, "GIT_COMMITTER_DATE": date}
+def _force_remove(func, target, _exc):
+    os.chmod(target, stat.S_IWRITE)  # git marks object files read-only on Windows
+    func(target)
+
+
+# ---------------------------------------------------------------------------------------------- builder
+class _History:
+    """Builds the whole history in memory, then writes it with one `git fast-import` stream.
+
+    One process instead of three git calls per commit: ~200 commits take well under a second, and the
+    result is byte-for-byte identical on every machine (same hashes everywhere).
+    """
+
+    def __init__(self) -> None:
+        self.authors = {**AUTHORS, **demo_story.AUTHORS_LATER}
+        self.files: dict[str, dict[str, str]] = {"main": {}}
+        self.heads: dict[str, int | None] = {"main": None}
+        self.fork_base: dict[str, dict[str, str]] = {}
+        self.branch = "main"
+        self.mark = 0
+        self.out: list[bytes] = []
+        self.last_key_change: dict[str, dict[str, str | None]] = {}  # branch -> {path: content before}
+
+    @staticmethod
+    def _stamp(iso: str) -> str:
+        dt = datetime.fromisoformat(iso)
+        minutes = int(dt.utcoffset().total_seconds() // 60)
+        sign = "+" if minutes >= 0 else "-"
+        return f"{int(dt.timestamp())} {sign}{abs(minutes) // 60:02d}{abs(minutes) % 60:02d}"
+
+    def _data(self, text: str) -> None:
+        raw = text.encode("utf-8")
+        self.out.append(b"data %d\n" % len(raw) + raw + b"\n")
+
+    def _person(self, author: str, date: str) -> str:
+        name, email = self.authors[author]
+        return f"{name} <{email}> {self._stamp(date)}"
+
+    def commit(self, author: str, date: str, message: str, new_files: dict[str, str],
+               merge_from: str | None = None, key: bool = True) -> None:
+        before = self.files[self.branch]
+        self.mark += 1
+        who = self._person(author, date)
+        self.out.append(f"commit refs/heads/{self.branch}\nmark :{self.mark}\nauthor {who}\ncommitter {who}\n".encode())
+        self._data(message.rstrip("\n") + "\n")
+        if self.heads[self.branch] is not None:
+            self.out.append(f"from :{self.heads[self.branch]}\n".encode())
+        if merge_from:
+            self.out.append(f"merge :{self.heads[merge_from]}\n".encode())
+        for path in sorted(set(before) | set(new_files)):
+            if path not in new_files:
+                self.out.append(f"D {path}\n".encode())
+            elif before.get(path) != new_files[path]:
+                self.out.append(f"M 100644 inline {path}\n".encode())
+                self._data(new_files[path])
+        self.out.append(b"\n")
+        if key:
+            self.last_key_change[self.branch] = {p: before.get(p) for p in set(before) | set(new_files)
+                                                 if before.get(p) != new_files.get(p)}
+        self.files[self.branch] = dict(new_files)
+        self.heads[self.branch] = self.mark
+
+    def tag(self, name: str, author: str, date: str, message: str) -> None:
+        self.out.append(f"tag {name}\nfrom :{self.heads[self.branch]}\ntagger {self._person(author, date)}\n".encode())
+        self._data(message.rstrip("\n") + "\n")
+
+    def start_branch(self, name: str) -> None:
+        self.files[name] = dict(self.files[self.branch])
+        self.heads[name] = self.heads[self.branch]
+        self.fork_base[name] = dict(self.files[self.branch])
+        self.branch = name
+
+    def merged(self, other: str) -> dict[str, str]:
+        base, theirs, ours = self.fork_base[other], self.files[other], dict(self.files[self.branch])
+        for path in set(base) | set(theirs):
+            if base.get(path) != theirs.get(path):
+                if path in theirs:
+                    ours[path] = theirs[path]
+                else:
+                    ours.pop(path, None)
+        return ours
+
+    def reverted(self) -> dict[str, str]:
+        files = dict(self.files[self.branch])
+        for path, old in self.last_key_change[self.branch].items():
+            if old is None:
+                files.pop(path, None)
+            else:
+                files[path] = old
+        return files
+
+
+def _apply_edits(files: dict[str, str], edits: dict) -> dict[str, str]:
+    files = dict(files)
+    for path, ops in edits.items():
+        for op in ops if isinstance(ops, list) else [ops]:
+            kind = op[0]
+            if kind == "set":
+                files[path] = op[1]
+            elif kind == "append":
+                files[path] = files.get(path, "") + op[1]
+            elif kind == "replace":
+                if op[1] not in files[path]:
+                    raise ValueError(f"demo story: {path} doesn't contain {op[1][:50]!r}")
+                files[path] = files[path].replace(op[1], op[2])
+            elif kind == "delete":
+                files.pop(path, None)
+    return files
+
+
+def _step_date(step: tuple) -> str:
+    return step[3] if step[0] == "tag" else step[2]
+
+
+def _run(h: _History, step: tuple) -> None:
+    kind = step[0]
+    if kind == "branch":
+        h.start_branch(step[1])
+    elif kind == "checkout":
+        h.branch = step[1]
+    elif kind == "merge":
+        _, author, date, branch, message = step
+        h.commit(author, date, message, h.merged(branch), merge_from=branch)
+    elif kind == "revert":
+        _, author, date, message = step
+        h.commit(author, date, message, h.reverted())
+    elif kind == "rename":  # era 1
+        _, author, date, old, new, message = step
+        files = dict(h.files[h.branch])
+        files[new] = files.pop(old)
+        files = {p: c.replace("taskflow.tasks", "taskflow.models") for p, c in files.items()}
+        h.commit(author, date, message, files)
+    elif kind == "edit":
+        _, author, date, message, edits = step
+        h.commit(author, date, message, _apply_edits(h.files[h.branch], edits))
+    elif kind == "tag":
+        _, name, author, date, message = step
+        h.tag(name, author, date, message)
+    elif kind == "restructure":
+        _, author, date, message, moves, imports = step
+        files = dict(h.files[h.branch])
+        for old, new in moves.items():
+            files[new] = files.pop(old)
+        for pkg in ("taskflow/core/__init__.py", "taskflow/api/__init__.py", "taskflow/cli/__init__.py"):
+            files[pkg] = ""
+        for old, new in sorted(imports.items(), key=lambda kv: -len(kv[0])):
+            files = {p: c.replace(old, new) for p, c in files.items()}
+        h.commit(author, date, message, files)
+    elif kind == "filler":
+        _, author, date, message, path, line = step
+        files = dict(h.files["main"])
+        files[path] = files.get(path, "") + line
+        h.commit(author, date, message, files, key=False)
+    else:  # era 1 plain commit: (author, date, message, {path: content | None})
+        author, date, message, changes = step
+        files = dict(h.files[h.branch])
+        for rel, content in changes.items():
+            if content is None:
+                files.pop(rel, None)
+            else:
+                files[rel] = content
+        h.commit(author, date, message, files)
+
+
+def _later_blocks() -> list[list[tuple]]:
+    """Key steps grouped so a branch's commits stay together, then merged by date with filler work."""
+    blocks, current = [], []
+    for step in demo_story.KEY_STEPS:
+        current.append(step)
+        in_branch = any(s[0] == "branch" for s in current) and not any(s[0] == "checkout" for s in current)
+        if step[0] == "branch" or in_branch:
+            continue
+        blocks.append(current)
+        current = []
+    dated = [(_step_date(next(s for s in b if s[0] not in ("branch", "checkout"))), b) for b in blocks]
+    dated += [(f[1], [("filler", *f)]) for f in demo_story.filler_steps()]
+    return [b for _, b in sorted(dated, key=lambda x: x[0][:16])]
 
 
 def _build(path: Path) -> None:
+    h = _History()
+    for step in STEPS:
+        _run(h, step)
+    h.tag("v1.0.0", "ada", "2025-03-10T10:05:00+01:00",
+          "TaskFlow 1.0\n\n- Tasks with due dates and priorities\n- Login with expiring JWT tokens\n- SQLite storage")
+    for block in _later_blocks():
+        for step in block:
+            _run(h, step)
     path.mkdir(parents=True)
     repo = git.Repo.init(path, initial_branch="main")
-    with repo.config_writer() as cw:  # identical bytes on every OS -> identical hashes
+    with repo.config_writer() as cw:
         cw.set_value("core", "autocrlf", "false")
         cw.set_value("commit", "gpgsign", "false")
         cw.set_value("user", "name", "GitLore Demo")
         cw.set_value("user", "email", "demo@gitlore.example")
-    g = repo.git
-    for step in STEPS:
-        kind = step[0]
-        if kind == "branch":
-            g.checkout("-b", step[1])
-        elif kind == "checkout":
-            g.checkout(step[1])
-        elif kind == "merge":
-            _, author, date, branch, message = step
-            with g.custom_environment(**_env(author, date)):
-                g.merge("--no-ff", branch, "-m", message)
-        elif kind == "revert":
-            _, author, date, message = step
-            with g.custom_environment(**_env(author, date)):
-                g.revert("--no-edit", "HEAD")
-                g.commit("--amend", "-m", message)
-        elif kind == "rename":
-            _, author, date, old, new, message = step
-            g.mv(old, new)
-            for py in (path / "taskflow").glob("*.py"):
-                text = py.read_text(encoding="utf-8")
-                if "taskflow.tasks" in text:
-                    py.write_text(text.replace("taskflow.tasks", "taskflow.models"), encoding="utf-8", newline="\n")
-            g.add("-A")
-            with g.custom_environment(**_env(author, date)):
-                g.commit("-m", message)
-        else:
-            author, date, message, files = step
-            for rel, content in files.items():
-                target = path / rel
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(content, encoding="utf-8", newline="\n")
-            g.add("-A")
-            with g.custom_environment(**_env(author, date)):
-                g.commit("-m", message)
+    subprocess.run(["git", "fast-import", "--quiet", "--done"], cwd=path,
+                   input=b"".join(h.out) + b"done\n", check=True, capture_output=True)
+    repo.git.reset("--hard", "main")
+    _marker(path).write_text(DEMO_VERSION)

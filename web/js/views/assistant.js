@@ -6,6 +6,12 @@ import { t, number } from "../i18n.js";
 import { renderMarkdown } from "../markdown.js";
 import { useApp, ConfirmDialog, PromptDialog, Progress } from "../ui.js";
 
+/** "About selected code in auth.py" or, for a whole commit, "About commit a1b2c3d". */
+function focusLabel(f) {
+  if (!f.text && f.commit) return t("assistant.focusCommit", { hash: f.commit.slice(0, 7) });
+  return t("assistant.focus", { path: f.path || "…" });
+}
+
 export function Assistant() {
   const app = useApp();
   const pid = app.project?.id;
@@ -48,7 +54,8 @@ export function Assistant() {
     const request = app.pendingAsk;
     if (!request) return;
     app.clearPendingAsk();
-    if (request.explain) send(t("menu.explainQuestion"), request.focus);
+    const questions = { commit: "explain.commitQuestion", change: "explain.changeQuestion" };
+    if (request.explain) send(t(questions[request.explain] || "menu.explainQuestion"), request.focus);
     else textarea.current?.focus();
   }, [app.pendingAsk]);
 
@@ -136,7 +143,7 @@ export function Assistant() {
 
     <form class="composer" onSubmit=${(e) => { e.preventDefault(); send(); }}>
       ${app.focus && html`<span class="focus-chip">
-        <span>${t("assistant.focus", { path: app.focus.path || "…" })}</span>
+        <span>${focusLabel(app.focus)}</span>
         <button type="button" class="icon-btn" style="width:20px;height:20px" aria-label=${t("assistant.removeFocus")}
           onClick=${() => app.setFocus(null)}><${Icon} name="close" size=${12} /></button></span>`}
       <label class="sr-only" for="ask">${t("assistant.placeholder")}</label>
@@ -186,7 +193,7 @@ function Message({ message }) {
   if (message.role === "user") {
     return html`<div class="msg user">
       <div class="bubble">${message.content}</div>
-      ${message.focus?.text && html`<div class="focus-chip" title=${message.focus.text}><span>${t("assistant.focus", { path: message.focus.path })}</span></div>`}
+      ${(message.focus?.text || message.focus?.commit) && html`<div class="focus-chip" title=${message.focus.text || ""}><span>${focusLabel(message.focus)}</span></div>`}
     </div>`;
   }
   return html`<div class="msg assistant-msg">
