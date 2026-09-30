@@ -183,14 +183,19 @@ chats, four languages and a dark theme.
 
 | Phase | Goal | Done when |
 |---|---|---|
-| **8. Foundation** | Starlette API over `src/`, static web shell (3-panel layout), theme toggle, i18n plumbing (EN strings), model download + indexing + chat with streaming ported. Streamlit removed. Launchers, CI and auto-shutdown updated (shutdown via page heartbeat). | Feature parity with v0.1 in the new UI; all CI green |
-| **9. Projects, chats & demo** | SQLite store; open/switch/new project; chat list with history (rename, delete); demo-project generator. | Restart the app and everything is still there; demo works offline |
-| **10. Commit explorer & diffs** | Commit list with search/filter; files changed per commit; Monaco diff (side-by-side and inline, colored). | Any commit's changes can be browsed like in VS Code |
-| **11. Ask AI from the code** | Right-click on a selection → "Ask GitLore" / "Explain this change"; the question carries the selection, file and commit as context; the assistant panel sits beside the diff. | Selection questions are answered with correct citations |
-| **12. Edit & commit** | Open a working-tree file in Monaco, edit, see the diff vs. HEAD, write a message, commit. Guards: shows `git status`, refuses to commit on detached HEAD or during merges/rebases. | A commit made in GitLore shows up in `git log` exactly like a CLI commit |
-| **13. Languages & release v0.2** | TR/FR/DE translations; AI answer-language benchmark; accessibility pass (keyboard, screen reader, contrast); screenshots; docs. | v0.2.0 released with CI green on 3 OSes |
+| **8. Foundation** ✅ | Starlette API over `src/`, static web shell (3-panel layout), theme toggle, i18n plumbing (EN strings), model download + indexing + chat with streaming ported. Streamlit removed. Launchers, CI and auto-shutdown updated (shutdown via page heartbeat). | Feature parity with v0.1 in the new UI; all CI green |
+| **9. Projects, chats & demo** ✅ | SQLite store; open/switch/new project; chat list with history (rename, delete); demo-project generator. | Restart the app and everything is still there; demo works offline |
+| **10. Commit explorer & diffs** ✅ | Commit list with search/filter; files changed per commit; Monaco diff (side-by-side and inline, colored). | Any commit's changes can be browsed like in VS Code |
+| **11. Ask AI from the code** ✅ | Right-click on a selection → "Ask GitLore" / "Explain this change"; the question carries the selection, file and commit as context; the assistant panel sits beside the diff. | Selection questions are answered with correct citations |
+| **12. Edit & commit** ✅ | Open a working-tree file in Monaco, edit, see the diff vs. HEAD, write a message, commit. Guards: shows `git status`, refuses to commit on detached HEAD or during merges/rebases. | A commit made in GitLore shows up in `git log` exactly like a CLI commit |
+| **13. Languages & release v0.2** ✅ | TR/FR/DE translations; AI answer-language benchmark; accessibility pass (keyboard, screen reader, contrast); screenshots; docs. | v0.2.0 released with CI green on 3 OSes |
 
-The earlier "better answers" ideas (exact-name search, date and author questions) move to **v0.3**.
+Shipped as **v0.2.0**, then **v0.2.1** (browser tests fixed and run in CI). Changes from the plan:
+D8 became a **built-in demo project** that is open on first launch (not a "Try the Demo" button);
+Monaco's own menus are translated too; small models answered Turkish questions in English until the
+answer language was repeated right after the question.
+
+The earlier "better answers" ideas (exact-name search, date and author questions) move to v0.3+ below.
 
 ## Risks
 
@@ -209,5 +214,54 @@ The earlier "better answers" ideas (exact-name search, date and author questions
 
 ## Open questions (decide later)
 
-- Also index file-level `git blame` for "who wrote this line" questions? (v0.3)
-- Package as a `pipx`/`uv tool` installable CLI (`gitlore /path/to/repo`)? (v0.3)
+- Also index file-level `git blame` for "who wrote this line" questions? (see phase 18)
+- Package as a `pipx`/`uv tool` installable CLI (`gitlore /path/to/repo`)?
+
+---
+
+# v0.3 and beyond — roadmap (planned 2026-09-30)
+
+GitLore should explain **why** a codebase became what it is, not just list what changed; help people
+who are new or coming back catch up; and stay calm to look at. Everything below is local and offline
+by default; the online mode is a separate, opt-in addition.
+
+## Principles
+
+- **Zen by default.** New views live behind the activity bar and open on demand. Every panel can be
+  hidden; a Zen mode shows only the editor (or only the chat). Colors are used for meaning, not decoration.
+- **Instant first, AI second.** Anything that can be computed from Git directly (categories, contributors,
+  churn, heatmaps, releases) is computed without the model, so it is instant. The model is used for the
+  parts only language can do (stories, "why", summaries) and its results are **cached** in SQLite with a
+  Regenerate button, because on a CPU they take seconds to minutes.
+- **Every AI claim links to its evidence.** Timeline events, summaries and profiles cite commits you can click.
+
+## Phases
+
+| Phase | What you get | Done when |
+|---|---|---|
+| **14. Calm workspace & details** (v0.3) | Hide/show each sidebar (buttons + shortcuts, remembered); **Zen mode** (editor only, or chat only); more color themes beyond light/dark (e.g. high contrast, solarized light/dark, sepia, a dimmed dark) built as token sets; **Explain buttons** without right-click: "Explain This Commit" in the commit header and a small "Explain" action per changed block in the diff; languages **Spanish, Italian, Chinese (Simplified)** added (UI, Monaco menus, answers, benchmarked like TR/FR/DE). | All panels hideable; 6+ themes pass contrast checks; 7 languages pass `test_i18n.py` |
+| **15. A bigger TaskFlow demo** (v0.3) | Regenerated demo with enough history to exercise everything below: ~2 years, ~200 commits, 6–8 fictional contributors who join and leave, feature branches and merges, tags **v1.0 → v2.x** with release notes, a large refactor, a security fix, a performance fix, reverts, renames, commit messages referencing issues (#12) and pull requests. Still generated, deterministic (identical hashes everywhere) and small on disk. | Every view in phases 16–18 shows meaningful data on the demo |
+| **16. Insights, without AI** (v0.3) | New **Insights** view: commit **categories** (feature, bug fix, refactor, performance, security, docs, tests, dependencies, **large change**) from message conventions, keywords and changed-file types, shown as small chips and usable as filters; **contributors** (involvement, areas they own, active periods); **hot files / churn**; a **commit heatmap** (calendar); activity over time. **Release explorer** (tags, what changed between releases); **branch view**; **compare** any two commits, branches or tags. | Opens instantly on a 2,000-commit repo; everything links to commits |
+| **17. The story of a repository** (v0.4) | **Generate Repository History**: an AI-written, cited narrative of how the project evolved, in eras. An **AI timeline** of key events (big features, rewrites, security fixes, releases), where clicking an event opens its commits. **"What changed while I was away?"**: pick a date (or "since my last visit") and get a short briefing. **Onboarding brief** for newcomers: the project in a page (major changes, key contributors, where to start reading). **Dig for "why"**: answers follow issue/PR references, related commits touching the same code, and reverts, before answering. Cached per project; regenerated on demand. | Briefings on the demo are accurate, cite commits, and regenerate in minutes on a laptop CPU |
+| **18. People and search** (v0.4) | **Minimal developer profiles** (what someone worked on, when, their areas; no rankings or scores); **"who knows this code?"** from line history (`git blame`); **advanced search** with filters (`author:`, `path:`, `type:`, `since:`/`until:`, `release:`) combined with meaning-based search, and saved searches. | Search answers "security fixes in auth/ last year by Leo" in one query |
+| **19. Online mode** (v0.5, opt-in) | Paste a GitHub URL (for example `github.com/microsoft/vscode`) → GitLore clones it and adds it as a project. Periodic **live** updates (fetch) while open; **related discussions** (pull requests, issues and reviews linked to a commit); GitHub releases in the release explorer. Clearly marked as online; everything else keeps working offline. | A public repo can be added by URL and its commits link to their PRs |
+| **20. Private repositories** (v0.5, needs a decision) | See the open question below. | — |
+
+## Decisions still needed
+
+- **GitHub sign-in for private repositories (phase 20).** Options: (a) **public repos only** at first, no
+  login (simplest, no secrets stored); (b) paste a **fine-grained personal access token**, stored in the
+  OS keychain, read-only scope; (c) **"Sign in with GitHub"** via the device flow (no password typed into
+  GitLore, lists your repos to import). Recommended path: ship (a) with phase 19, then (c) with (b) as the
+  fallback for GitHub Enterprise. Large repos (vscode has 100k+ commits) need a commit-count limit or a
+  shallow first import either way.
+- Which extra themes exactly (phase 14), and whether profiles show any numbers at all (phase 18).
+
+## Risks
+
+- **CPU time for AI narratives.** Summarizing hundreds of commits with a 1.7B model takes minutes. Plan:
+  work in chunks (per era/release), cache every result, show progress, never block the UI.
+- **Categorization accuracy.** Rules are fast but imperfect; categories show as "suggested" and the
+  model only re-checks ambiguous commits.
+- **Scope creep vs. calm UI.** Each phase adds at most one new activity-bar view; the rest goes into
+  existing views or on-demand panels.

@@ -29,3 +29,16 @@ The first run installs dependencies and downloads a ~1.1 GB model. Full instruct
 GitLore reads your commit history with GitPython, indexes it for semantic search in ChromaDB,
 and answers questions with [Qwen3-1.7B](https://huggingface.co/Qwen/Qwen3-1.7B) running locally via llama.cpp,
 all in a VS Code-like browser workspace built on Monaco. Details: [PLAN.md](PLAN.md).
+
+## Roadmap
+
+- **v0.3:** hideable panels and a Zen mode, more color themes, Spanish, Italian and Chinese, one-click
+  "Explain" buttons, a much bigger demo project, and an **Insights** view: commit categories (features,
+  fixes, refactors, performance, security), contributors, hot files, a commit heatmap, releases, branches
+  and comparisons.
+- **v0.4:** AI-written, cited **repository history** and **timeline**, "What changed while I was away?",
+  onboarding briefs for newcomers, answers that dig for *why*, minimal developer profiles and advanced search.
+- **v0.5:** optional **online mode**: add a GitHub repository by URL, live updates, and the pull requests
+  and discussions behind each commit.
+
+Details and open decisions: [PLAN.md](PLAN.md#v03-and-beyond--roadmap-planned-2026-09-30).
