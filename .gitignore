@@ -1,0 +1,17 @@
+# Environments
+.venv/
+venv/
+
+# Downloaded models and vector DB
+data/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
