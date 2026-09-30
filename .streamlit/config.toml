@@ -2,6 +2,10 @@
 # Local, private app: never send usage statistics.
 gatherUsageStats = false
 
+[theme]
+# Light/dark follows the user's system; only the accent color is set.
+primaryColor = "#4C6EF5"
+
 [client]
 # Hide the "Deploy" button and developer menu items — this is a local tool.
 toolbarMode = "minimal"

@@ -131,3 +131,25 @@ def test_error_not_a_repo(tmp_path: Path):
 def test_error_empty_repo(rb: RepoBuilder):
     with pytest.raises(RepoError, match="no commits"):
         get_commits(str(rb.path))
+
+
+@pytest.mark.parametrize("remote, expected", [
+    ("https://github.com/MetehanDemirel/GitLore.git", "https://github.com/MetehanDemirel/GitLore/commit/"),
+    ("git@github.com:psf/requests.git", "https://github.com/psf/requests/commit/"),
+    ("https://user:token@github.com/o/r", "https://github.com/o/r/commit/"),
+    ("ssh://git@gitlab.com/group/sub/proj.git", "https://gitlab.com/group/sub/proj/-/commit/"),
+    ("https://example.com/self-hosted/repo.git", None),
+])
+def test_commit_url_base(rb, remote, expected):
+    from src.git_parser import commit_url_base
+
+    rb.commit("init", {"a.txt": "a\n"})
+    rb.repo.create_remote("origin", remote)
+    assert commit_url_base(str(rb.path)) == expected
+
+
+def test_commit_url_base_without_remote(rb):
+    from src.git_parser import commit_url_base
+
+    rb.commit("init", {"a.txt": "a\n"})
+    assert commit_url_base(str(rb.path)) is None

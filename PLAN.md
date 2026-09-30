@@ -107,8 +107,12 @@ GitLore/
 5. **Chat engine** ✅ — prompt capped at `MAX_PROMPT_TOKENS` (1,800) measured with the model's tokenizer; diffs
    trimmed to 600 chars in the prompt; message-only fallback; short follow-ups reuse the previous turn's commits.
    Measured on i5-11400H: first word after ~12–15 s (was ~28 s with a full 3,500-token prompt), ~25 tokens/s after.
-6. **UI** — sidebar (repo path, commit count, model preset, Index button, status), chat, citations expander.
-7. **Polish** — auto-shutdown watchdog, error messages, README with screenshot, license (MIT?).
+6. **UI** ✅ — side panel with *Model* (preset or custom GGUF, download with progress, remove) and *Repository*
+   (path, commit count, index/update/rebuild with progress) sections; "Get started" checklist until ready; chat
+   with status line, streamed answers, hash citations linked to GitHub/GitLab, *Sources* expander; example
+   questions; follows system light/dark theme; remembers last repo/model in `data/settings.json`.
+7. **Polish** — auto-shutdown watchdog ✅ (verified: exits ~30 s after the last tab closes). Remaining: README
+   screenshot, license (MIT?), test on macOS/Linux.
 
 ## Claude Code skills to use while building (all already installed — nothing to download)
 

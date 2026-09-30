@@ -8,6 +8,7 @@ large repos. Diffs are truncated while streaming, so memory stays bounded.
 from __future__ import annotations
 
 import os
+import re
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import TypedDict
@@ -57,6 +58,24 @@ def open_repo(repo_path: str) -> git.Repo:
     if not repo.head.is_valid():
         raise RepoError("This repository has no commits yet.")
     return repo
+
+
+_REMOTE_RE = re.compile(
+    r"^(?:https?://(?:[^@/]+@)?|ssh://git@|git@)(?P<host>github\.com|gitlab\.com)[:/](?P<path>.+?)(?:\.git)?/?$"
+)
+
+
+def commit_url_base(repo_path: str) -> str | None:
+    """Web URL prefix for commits (…/commit/<hash>) if `origin` is on GitHub or GitLab, else None."""
+    try:
+        url = open_repo(repo_path).remotes.origin.url
+    except (RepoError, AttributeError, ValueError):
+        return None
+    m = _REMOTE_RE.match(url.strip())
+    if not m:
+        return None
+    sep = "/-/commit/" if m["host"] == "gitlab.com" else "/commit/"
+    return f"https://{m['host']}/{m['path']}{sep}"
 
 
 def get_commits(repo_path: str, max_count: int = config.DEFAULT_COMMIT_COUNT) -> list[Commit]:

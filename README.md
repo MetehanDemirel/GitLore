@@ -8,7 +8,7 @@
 - 💻 **Runs on any ordinary computer** — CPU only, no GPU or compiler needed
 - ⚡ **One-click start** — double-click `start.bat` (Windows) or run `./start.sh` (macOS/Linux)
 
-> 🚧 **Status: early development.** The project scaffold is in place; ingestion, search and chat are being built. See [PLAN.md](PLAN.md).
+> **Status: working preview.** Indexing, search and chat work end to end on Windows. See [PLAN.md](PLAN.md) for what's next.
 
 ## Quick start
 
