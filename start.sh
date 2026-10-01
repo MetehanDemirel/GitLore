@@ -5,7 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 VENV_PY=".venv/bin/python"
 
-fail() { echo "[GitLore] $1"; echo "[GitLore] See SETUP.md for troubleshooting."; exit 1; }
+fail() { echo "[GitLore] $1"; echo "[GitLore] See README.md, Troubleshooting."; exit 1; }
 
 command -v git >/dev/null || fail "Git is not installed or not on PATH."
 HAS_UV=0; command -v uv >/dev/null && HAS_UV=1

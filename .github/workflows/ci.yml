@@ -18,7 +18,7 @@ jobs:
         python: ["3.11", "3.12", "3.13"]
         exclude:
           # Upstream's llama-cpp-python 0.3.19 cp313 macOS wheel is a malformed ZIP that uv rejects.
-          # The launcher always uses Python 3.12, so users are unaffected (see SETUP.md).
+          # The launcher always uses Python 3.12, so users are unaffected (see README, Troubleshooting).
           - os: macos-latest
             python: "3.13"
     steps:

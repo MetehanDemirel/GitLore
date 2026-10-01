@@ -56,6 +56,6 @@ exit /b %errorlevel%
 
 :fail
 echo.
-echo [GitLore] Setup failed. See SETUP.md for troubleshooting.
+echo [GitLore] Setup failed. See README.md, Troubleshooting.
 pause
 exit /b 1

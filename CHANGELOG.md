@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.3.1] — 2026-10-01
 
 ### Improved
 - **More accurate answers with the same model.** Questions are read for people, files, releases, kinds of
@@ -13,6 +13,11 @@
 - Deleting a chat no longer freezes the assistant panel; deleting during an answer stops it.
 - Follow-up questions no longer fail when the previous answer used commits.
 - After an update, the browser loads the new interface instead of a cached old copy.
+- Category chips in the commit list are no longer cut off; the author name gives way instead.
+
+### Docs
+- One README instead of README, SETUP and PLAN: what GitLore does, how the AI works, measured quality
+  and speed, screenshots and a GIF of the real app (`scripts/capture_media.py` regenerates them).
 
 ## [0.3.0] — 2026-09-30
 

@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-VERSION = "0.3.0"  # keep in sync with CHANGELOG.md
+VERSION = "0.3.1"  # keep in sync with CHANGELOG.md
 
 # --- Paths -------------------------------------------------------------------
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -46,7 +46,7 @@ class ModelPreset:
     size_gb: float
 
 
-# Chosen by benchmark (PLAN.md, "Model choice"): of 9 small models, Qwen3-1.7B was as fast as the
+# Chosen by benchmark (README, "Choosing the model"): of 9 small models, Qwen3-1.7B was as fast as the
 # previous default and the only one that said "not in the commits" instead of inventing an answer.
 MODEL_PRESETS: dict[str, ModelPreset] = {
     "qwen3-1.7b": ModelPreset(

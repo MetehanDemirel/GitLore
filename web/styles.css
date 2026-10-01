@@ -245,7 +245,9 @@ a { color: var(--accent); }
 .commit[aria-current="true"] .node { background: var(--who); }
 .commit .subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .commit .meta { grid-column: 2; display: flex; gap: 6px; color: var(--muted); font-size: 12px; overflow: hidden; white-space: nowrap; }
-.commit .meta .who { color: var(--who); font-weight: 600; }
+.commit .meta > * { flex: none; }
+.commit .meta .who { color: var(--who); font-weight: 600; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.commit .meta .chips { margin-left: auto; }  /* the category stays whole; the name gives way */
 .commit .meta .mono { font-size: 11px; }
 
 .files { list-style: none; margin: 0 0 6px; padding: 0 0 0 30px; }
