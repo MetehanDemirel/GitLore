@@ -59,7 +59,7 @@ no sign-in, nothing stored (a `GITHUB_TOKEN` environment variable raises GitHub'
 ## How the AI Works
 
 ```mermaid
-flowchart LR
+flowchart TD
   Q[Your question] --> U[Read the question<br/>people · files · releases<br/>kind of change · 'latest']
   U --> F[Exact matches<br/>from the history index]
   Q --> S[Meaning search<br/>MiniLM embeddings in Chroma]

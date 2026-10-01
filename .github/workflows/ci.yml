@@ -27,6 +27,8 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           activate-environment: true
+          # The Linux llama.cpp build is cached; "portable" keeps old CPU-specific builds out (see below).
+          cache-suffix: portable
       - name: Cache embedding model
         uses: actions/cache@v4
         with:
@@ -35,6 +37,10 @@ jobs:
       # Failures are also copied into an annotation, which is readable without signing in.
       - name: Install dependencies
         shell: bash
+        env:
+          # Build for any x86-64 CPU, not just this runner's: the cached build is reused on runners with
+          # older CPUs, where a native build crashes with "illegal instruction" (exit code 132).
+          CMAKE_ARGS: -DGGML_NATIVE=OFF
         run: |
           set +e  # Actions runs bash with -e -o pipefail; keep going to report the failure
           extra=()
