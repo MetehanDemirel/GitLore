@@ -43,13 +43,13 @@ export async function waitForJob(jobId, onProgress, intervalMs = 400) {
 }
 
 /** POST a question and read the server-sent events it streams back. */
-export async function streamAnswer(chatId, question, focus, onEvent, signal) {
+export async function streamAnswer(chatId, question, focus, onEvent, signal, tags = []) {
   let res;
   try {
     res = await fetch(`/api/chats/${chatId}/ask`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, focus }),
+      body: JSON.stringify({ question, focus, tags }),
       signal,
     });
   } catch (e) {

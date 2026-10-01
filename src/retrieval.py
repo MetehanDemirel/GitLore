@@ -115,11 +115,11 @@ def _commit(repo_path: str, hash_: str) -> list[Commit]:
 
 
 def gather(repo_path: str, question: str, turns: Sequence[chat_engine.Turn] = (),
-           previous: Sequence[Commit] = (), focus_commit: str | None = None) -> list[Commit]:
+           previous: Sequence[Commit] = (), pinned: Sequence[str] = ()) -> list[Commit]:
     """Best-first candidate commits for a question (the prompt builder keeps as many as fit)."""
     follow_up = chat_engine.is_follow_up(question, turns)
     query = chat_engine.retrieval_query(question, turns)
-    focused = _commit(repo_path, focus_commit) if focus_commit else []
+    focused = [c for h in pinned for c in _commit(repo_path, h)]  # focused or tagged by the user
     # The chat stores only summaries of the commits an answer used; reload them in full.
     previous = [c for p in previous for c in _commit(repo_path, p["hash"])] if follow_up else []
     found = understand(repo_path, question) or (understand(repo_path, query) if follow_up else {})

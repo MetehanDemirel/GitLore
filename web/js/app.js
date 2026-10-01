@@ -41,6 +41,7 @@ function App({ initial }) {
   const [selection, setSelection] = useState(null);
   const [focus, setFocus] = useState(null);
   const [pendingAsk, setPendingAsk] = useState(null);
+  const [tags, setTags] = useState([]);                                   // commits tagged for the next question
   const [sideBySide, setSideBySideState] = useState(store.get("gitlore.sideBySide", "1") === "1");
   const [theme, setTheme] = useState(resolveTheme(initial.settings.theme));
   const [monaco, setMonaco] = useState(null);
@@ -210,6 +211,10 @@ function App({ initial }) {
     toast, reload, setFocus, setDirty, setChangeCount, trackIndexJob, confirmLeaveEditor, setHistoryQuery,
     retryEditor: startEditor, toggleZen, toggleSidebar, toggleAssistant, fetchOnline,
     clearPendingAsk: () => setPendingAsk(null),
+    tags,
+    tagCommit: (c) => { setTags((ts) => ts.some((x) => x.hash === c.hash) || ts.length >= 5 ? ts : [...ts, c]); toggleAssistant(true); },
+    untag: (hash) => setTags((ts) => ts.filter((x) => x.hash !== hash)),
+    clearTags: () => setTags([]),
     openSettings: () => setPage("settings"),
     setSideBySide: (v) => { setSideBySideState(v); store.set("gitlore.sideBySide", v ? "1" : "0"); },
     async select(sel) {
@@ -219,7 +224,7 @@ function App({ initial }) {
     },
     async openProject(id) {
       if (!(await confirmLeaveEditor())) return;
-      setProjectId(id); setSelection(null); setFocus(null); setPage(null); setHistoryQuery("");
+      setProjectId(id); setSelection(null); setFocus(null); setTags([]); setPage(null); setHistoryQuery("");
       api.post("/api/settings", { last_project: id });
     },
     async openCommit(hash) {
@@ -270,7 +275,7 @@ function App({ initial }) {
       const { job } = await api.post(`/api/projects/${project.id}/index`, {});  // teach the assistant the new commit
       trackIndexJob(project.id, job);
     },
-  }), [boot, project, selection, focus, pendingAsk, sideBySide, theme, monaco, editorJob, editorError, indexJobs,
+  }), [boot, project, selection, focus, pendingAsk, tags, sideBySide, theme, monaco, editorJob, editorError, indexJobs,
        assistantOpen, versions, dirtyPath, zen, historyQuery, visits, fetchJob, sidebarOpen]);
 
   // ------------------------------------------------------------------ layout

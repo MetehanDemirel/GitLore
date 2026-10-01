@@ -146,6 +146,8 @@ export function CommitEditor() {
         ${path && html`<span class="muted" style="overflow:hidden;text-overflow:ellipsis">${subject}</span>`}
       </div>
       <button class="btn" onClick=${explainCommit} title=${t("explain.commitHint")}><${Icon} name="sparkle" /> ${t("explain.commit")}</button>
+      <button class="icon-btn" aria-label=${t("tags.add")} title=${t("tags.add")} aria-pressed=${app.tags.some((x) => x.hash === detail.hash)}
+        onClick=${() => app.tagCommit({ hash: detail.hash, short: detail.short_hash, subject })}><${Icon} name="tag" /></button>
       ${path && file?.status !== "deleted" && html`<button class="icon-btn" onClick=${() => setBlame(true)}
         aria-label=${t("blame.who")} title=${t("blame.who")}><${Icon} name="people" /></button>`}
       ${body && html`<button class="icon-btn" onClick=${() => setShowMessage(!showMessage)} aria-expanded=${showMessage}

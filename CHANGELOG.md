@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- **Tag commits in the chat.** The tag button in a commit's header adds it to the chat box as a chip
+  ("Commit 330c2a8"); tag up to five, then ask about them together. Tagged commits are read first and stay
+  shown on the question.
 - **Use a model server on your computer.** *Settings → Model → Local Server*: connect GitLore to Ollama,
   LM Studio, llama.cpp's server or anything else with an OpenAI-compatible API (for example
   `http://localhost:11434`), pick one of its models, and answers and stories come from it. Only addresses on

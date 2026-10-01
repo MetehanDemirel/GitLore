@@ -321,5 +321,8 @@
   "settings.serverInUse": "Answers come from {model} at {url}.",
   "settings.serverNotSet": "Not connected yet. Start your server, then click Connect.",
   "assistant.noServerModel": "The assistant uses a model server on this computer. Connect to it and pick a model in Settings.",
-  "assistant.openModelSettings": "Open Model Settings"
+  "assistant.openModelSettings": "Open Model Settings",
+  "tags.add": "Tag in Chat",
+  "tags.chip": "Commit {hash}",
+  "tags.remove": "Remove commit {hash}"
 }

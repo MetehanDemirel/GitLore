@@ -208,3 +208,15 @@ def test_rename_and_delete_chat(client):
     assert post(client, f"/api/chats/{chat['id']}", {"title": " "}, "PATCH").status_code == 400
     post(client, f"/api/chats/{chat['id']}", method="DELETE")
     assert client.get(f"/api/chats/{chat['id']}/messages").status_code == 404
+
+
+def test_tagged_commits_are_used_first_and_kept_with_the_question(client):
+    pid = demo_project(client)["id"]
+    commits = client.get(f"/api/projects/{pid}/commits").json()
+    tagged = [commits[5]["hash"], commits[40]["hash"]]
+    chat = post(client, f"/api/projects/{pid}/chats", {}).json()
+    with client.stream("POST", f"/api/chats/{chat['id']}/ask", json={"question": "Compare these", "tags": tagged}) as r:
+        events = [json.loads(line[6:]) for line in r.iter_lines() if line.startswith("data: ")]
+    used = next(e for e in events if e["type"] == "commits")["commits"]
+    assert [c["hash"] for c in used[:2]] == tagged
+    assert client.get(f"/api/chats/{chat['id']}/messages").json()[0]["focus"] == {"tags": tagged}

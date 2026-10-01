@@ -546,15 +546,18 @@ def _answer_stream(c: dict, project: dict, question: str, focus: dict | None) ->
         with MODELS.lock:
             llm = current_llm()
             yield _sse({"type": "status", "stage": "searching"})
-            focus_commit = None
-            if focus and focus.get("commit"):
+            pinned = []  # the focused commit, then commits the user tagged
+            for ref in ([focus["commit"]] if focus and focus.get("commit") else []) + list((focus or {}).get("tags", [])):
                 try:
-                    focus_commit = git_ops.commit_detail(project["path"], focus["commit"])["hash"]
+                    pinned.append(git_ops.commit_detail(project["path"], ref)["hash"])
                 except (RepoError, GitOpError):
                     pass
-            candidates = retrieval.gather(project["path"], question, turns, previous, focus_commit)
+            candidates = retrieval.gather(project["path"], question, turns, previous, pinned)
             notes = _discussion_notes(project, candidates[:1])
-            messages, used_full = chat_engine.build_messages(llm, question, candidates, turns, language, focus, notes)
+            tagged = [h[:7] for h in pinned[1 if focus and focus.get("commit") else 0:]]
+            cited = ", ".join(f"[{h}]" for h in tagged)
+            asked = question + (f"\n(The user tagged these commits: {cited}.)" if tagged else "")
+            messages, used_full = chat_engine.build_messages(llm, asked, candidates, turns, language, focus, notes)
             used = [_commit_summary(x) for x in used_full]
             store.update_message(reply_id, commits=used)
             yield _sse({"type": "commits", "commits": used})
@@ -602,6 +605,9 @@ async def ask(request: Request) -> Response:
     focus = data.get("focus") if isinstance(data.get("focus"), dict) else None
     if focus:
         focus = {k: str(focus.get(k) or "")[:20_000] for k in ("path", "commit", "text", "side")}
+    tags = data.get("tags")
+    if isinstance(tags, list) and tags:  # commits tagged in the chat box, kept with the message
+        focus = {**(focus or {}), "tags": [str(h)[:40] for h in tags[:5]]}
     return StreamingResponse(_answer_stream(c, project, question[:4000], focus), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 

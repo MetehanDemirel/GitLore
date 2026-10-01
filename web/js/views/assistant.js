@@ -76,7 +76,9 @@ export function Assistant() {
     }
     setInput("");
     app.setFocus(null);
-    setMessages((m) => [...m, { role: "user", content: question, focus, id: `u${Date.now()}` }]);
+    const sentTags = app.tags;
+    app.clearTags();
+    setMessages((m) => [...m, { role: "user", content: question, focus: sentTags.length ? { ...(focus || {}), tags: sentTags.map((x) => x.short) } : focus, id: `u${Date.now()}` }]);
     const state = { stage: "loading", commits: [], text: "", error: null, seconds: null };
     setRunning({ ...state });
     const controller = new AbortController();
@@ -89,7 +91,7 @@ export function Assistant() {
         else if (ev.type === "done") state.seconds = ev.seconds;
         else if (ev.type === "error") state.error = ev.message;
         setRunning({ ...state });
-      }, controller.signal);
+      }, controller.signal, sentTags.map((x) => x.hash));
     } catch (e) {
       state.error = e.message === "offline" ? t("common.offline") : e.message;
     }
@@ -162,6 +164,10 @@ export function Assistant() {
         <span>${focusLabel(app.focus)}</span>
         <button type="button" class="icon-btn" style="width:20px;height:20px" aria-label=${t("assistant.removeFocus")}
           onClick=${() => app.setFocus(null)}><${Icon} name="close" size=${12} /></button></span>`}
+      ${app.tags.map((c) => html`<span class="focus-chip" key=${c.hash} title=${c.subject}>
+        <${Icon} name="tag" size=${12} /><span>${t("tags.chip", { hash: c.short })}</span>
+        <button type="button" class="icon-btn" style="width:20px;height:20px" aria-label=${t("tags.remove", { hash: c.short })}
+          onClick=${() => app.untag(c.hash)}><${Icon} name="close" size=${12} /></button></span>`)}
       <label class="sr-only" for="ask">${t("assistant.placeholder")}</label>
       <div class="row" style="align-items:flex-end">
         <textarea id="ask" ref=${textarea} class="textarea grow" rows="2" placeholder=${t("assistant.placeholder")}
@@ -209,6 +215,7 @@ function Message({ message }) {
     return html`<div class="msg user">
       <div class="bubble">${message.content}</div>
       ${(message.focus?.text || message.focus?.commit) && html`<div class="focus-chip" title=${message.focus.text || ""}><span>${focusLabel(message.focus)}</span></div>`}
+      ${(message.focus?.tags || []).map((h) => html`<div class="focus-chip" key=${h}><${Icon} name="tag" size=${12} /><span>${t("tags.chip", { hash: h.slice(0, 7) })}</span></div>`)}
     </div>`;
   }
   return html`<div class="msg assistant-msg">
