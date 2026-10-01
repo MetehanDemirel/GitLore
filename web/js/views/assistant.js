@@ -243,6 +243,10 @@ function ModelNotice() {
     } catch (e) { setError(e.message); setJob(null); }
   };
   const pct = job?.total ? (job.done / job.total) * 100 : 0;
+  if (app.settings.model_source === "server") return html`<div class="notice">
+    <p>${t("assistant.noServerModel")}</p>
+    <button class="btn primary" onClick=${app.openSettings}><${Icon} name="settings" /> ${t("assistant.openModelSettings")}</button>
+  </div>`;
   return html`<div class="notice">
     <p>${t("assistant.noModel")}</p>
     ${job ? html`<p class="hint">${t("assistant.downloading", { done: number(job.done / 1e9, 2), total: number(job.total / 1e9, 2) })}</p>

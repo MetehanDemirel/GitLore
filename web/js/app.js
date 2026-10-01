@@ -210,6 +210,7 @@ function App({ initial }) {
     toast, reload, setFocus, setDirty, setChangeCount, trackIndexJob, confirmLeaveEditor, setHistoryQuery,
     retryEditor: startEditor, toggleZen, toggleSidebar, toggleAssistant, fetchOnline,
     clearPendingAsk: () => setPendingAsk(null),
+    openSettings: () => setPage("settings"),
     setSideBySide: (v) => { setSideBySideState(v); store.set("gitlore.sideBySide", v ? "1" : "0"); },
     async select(sel) {
       if (!(await confirmLeaveEditor())) return;

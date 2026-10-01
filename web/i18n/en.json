@@ -307,5 +307,19 @@
   "welcome.brief": "Read the Welcome Brief",
   "welcome.openGithub": "Add from GitHub",
   "welcome.shortcuts": "Ctrl+B hides the sidebar, Ctrl+Alt+B the assistant, Ctrl+K Z enters Zen mode.",
-  "panels.focusChat": "Focus Chat"
+  "panels.focusChat": "Focus Chat",
+  "settings.modelSource": "Model source",
+  "settings.builtin": "Built-in Model",
+  "settings.localServer": "Local Server",
+  "settings.localServerNote": "Use a model you already run on this computer with Ollama, LM Studio or llama.cpp's server. GitLore talks to it over its OpenAI-compatible API; only addresses on this computer are allowed.",
+  "settings.serverUrl": "Server address",
+  "settings.connect": "Connect",
+  "settings.connecting": "Connecting…",
+  "settings.serverModel": "Model",
+  "settings.noServerModels": "The server is running but offers no models. Download one in that app first (for example: ollama pull qwen3:1.7b).",
+  "settings.useServer": "Use This Model",
+  "settings.serverInUse": "Answers come from {model} at {url}.",
+  "settings.serverNotSet": "Not connected yet. Start your server, then click Connect.",
+  "assistant.noServerModel": "The assistant uses a model server on this computer. Connect to it and pick a model in Settings.",
+  "assistant.openModelSettings": "Open Model Settings"
 }

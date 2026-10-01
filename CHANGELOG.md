@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+- **Use a model server on your computer.** *Settings → Model → Local Server*: connect GitLore to Ollama,
+  LM Studio, llama.cpp's server or anything else with an OpenAI-compatible API (for example
+  `http://localhost:11434`), pick one of its models, and answers and stories come from it. Only addresses on
+  this computer are accepted, so code still never leaves the machine.
+
 ## [0.3.1] — 2026-10-01
 
 ### Improved

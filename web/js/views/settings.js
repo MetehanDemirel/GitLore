@@ -64,6 +64,11 @@ export function SettingsPage() {
 
     <section aria-labelledby="s-model">
       <h2 id="s-model">${t("settings.model")}</h2>
+      <div class="segmented" role="group" aria-label=${t("settings.modelSource")} style="margin-bottom:12px">
+        <button aria-pressed=${s.model_source !== "server"} onClick=${() => app.updateSettings({ model_source: "builtin" })}>${t("settings.builtin")}</button>
+        <button aria-pressed=${s.model_source === "server"} onClick=${() => app.updateSettings({ model_source: "server" })}>${t("settings.localServer")}</button>
+      </div>
+      ${s.model_source === "server" ? html`<${LocalServer} />` : html`
       <label class="field"><span class="sr-only">${t("settings.model")}</span>
         <select class="select" style="max-width:420px" value=${s.preset} onChange=${(e) => app.updateSettings({ preset: e.target.value })}>
           ${Object.entries(app.presets).map(([k, p]) => html`<option value=${k}>${p.label}</option>`)}
@@ -88,7 +93,7 @@ export function SettingsPage() {
       ${modelError && html`<p class="error-box">${modelError}</p>`}
       ${app.model.downloaded
         ? html`<button class="btn danger" onClick=${() => setDialog("model")}><${Icon} name="trash" /> ${t("settings.removeModel")}</button>`
-        : html`<button class="btn primary" disabled=${!!modelJob} onClick=${downloadModel}><${Icon} name="download" /> ${t("settings.downloadModel")}</button>`}
+        : html`<button class="btn primary" disabled=${!!modelJob} onClick=${downloadModel}><${Icon} name="download" /> ${t("settings.downloadModel")}</button>`}`}
     </section>
 
     <section aria-labelledby="s-projects">
@@ -163,5 +168,48 @@ export function SettingsPage() {
     ${dialog?.rename && html`<${PromptDialog} title=${t("settings.renameProject")} label=${t("settings.renameProject")}
       value=${dialog.rename.name} action=${t("common.save")} onClose=${() => setDialog(null)}
       onSubmit=${async (name) => { await api.patch(`/api/projects/${dialog.rename.id}`, { name }); app.reload(); }} />`}
+  </div>`;
+}
+
+/** A model served by another app on this computer (Ollama, LM Studio, llama.cpp server…). */
+function LocalServer() {
+  const app = useApp();
+  const s = app.settings;
+  const [url, setUrl] = useState(s.server_url);
+  const [models, setModels] = useState(null);
+  const [model, setModel] = useState(s.server_model);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  const connect = async () => {
+    setBusy(true); setError(null);
+    try {
+      const res = await api.get(`/api/model/server-models?url=${encodeURIComponent(url)}`);
+      setUrl(res.url); setModels(res.models);
+      if (!res.models.includes(model)) setModel(res.models[0] || "");
+    } catch (e) { setError(e.message); setModels(null); }
+    setBusy(false);
+  };
+  const save = () => app.updateSettings({ server_url: url, server_model: model });
+
+  return html`<div style="max-width:420px">
+    <p class="hint">${t("settings.localServerNote")}</p>
+    <label class="field"><span>${t("settings.serverUrl")}</span>
+      <div class="row" style="gap:6px">
+        <input class="input grow" value=${url} placeholder="http://localhost:11434" spellcheck="false" autocomplete="off"
+          onInput=${(e) => setUrl(e.target.value)} onKeyDown=${(e) => e.key === "Enter" && connect()} />
+        <button class="btn" disabled=${busy} onClick=${connect}>${busy ? t("settings.connecting") : t("settings.connect")}</button>
+      </div>
+    </label>
+    ${error && html`<p class="error-box">${error}</p>`}
+    ${models && !models.length && html`<p class="muted">${t("settings.noServerModels")}</p>`}
+    ${models && models.length > 0 && html`<label class="field"><span>${t("settings.serverModel")}</span>
+      <select class="select" value=${model} onChange=${(e) => setModel(e.target.value)}>
+        ${models.map((m) => html`<option value=${m}>${m}</option>`)}
+      </select></label>
+      <button class="btn primary" style="margin-top:8px" onClick=${save}>${t("settings.useServer")}</button>`}
+    <p class=${s.server_model ? "" : "muted"} style="margin-top:10px">${s.server_model
+      ? t("settings.serverInUse", { model: s.server_model, url: s.server_url })
+      : t("settings.serverNotSet")}</p>
   </div>`;
 }

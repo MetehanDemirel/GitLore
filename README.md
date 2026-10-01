@@ -44,6 +44,11 @@ everything can be tried right away.
 
 **Search like you think:** `author:priya type:security path:auth since:2025-06 release:v2.0.0 is:large token`.
 
+**Bring your own model (optional):** already running Ollama, LM Studio or llama.cpp's server? Switch
+*Settings → Model* to **Local Server**, enter its address (for example `http://localhost:11434`), click
+*Connect* and pick a model. GitLore talks to it over the standard OpenAI-compatible API, so a bigger or
+GPU-accelerated model can answer instead of the built-in one. Only servers on this computer are accepted.
+
 **Online mode (optional):** paste `github.com/owner/repo` and GitLore keeps a read-only, shallow copy up to
 date while it's open, and shows the pull requests and issues behind each commit. Public repositories only,
 no sign-in, nothing stored (a `GITHUB_TOKEN` environment variable raises GitHub's rate limit).

@@ -7,6 +7,7 @@ user's repositories.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import threading
@@ -24,8 +25,8 @@ from starlette.responses import FileResponse, JSONResponse, Response, StreamingR
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from src import (chat_engine, config, demo, git_ops, insights, model_manager, narratives, online, retrieval, store,
-                 vector_store, vendor)
+from src import (chat_engine, config, demo, git_ops, insights, local_server, model_manager, narratives, online,
+                 retrieval, store, vector_store, vendor)
 from src.config import ModelPreset
 from src.git_ops import GitOpError
 from src.git_parser import RepoError, get_commits, open_repo
@@ -124,8 +125,22 @@ class LockedLlm:
             yield from self._llm.create_chat_completion(**kwargs)
 
 
+def using_local_server() -> bool:
+    return store.get_setting("model_source", "builtin") == "server" and not os.environ.get("GITLORE_FAKE_LLM")
+
+
 def model_available() -> bool:
+    if using_local_server():
+        return bool(store.get_setting("server_model", ""))
     return model_manager.is_downloaded(current_preset()) or bool(os.environ.get("GITLORE_FAKE_LLM"))
+
+
+def current_llm():
+    """The model answers come from: the built-in one, or a model server on this computer."""
+    if using_local_server():
+        return local_server.LocalServerLlm(store.get_setting("server_url", local_server.DEFAULT_URL),
+                                           store.get_setting("server_model", ""))
+    return MODELS.get(current_preset())
 
 
 def _fake_llm():
@@ -288,11 +303,14 @@ async def state(request: Request) -> Response:
             "custom_repo": store.get_setting("custom_repo", ""),
             "custom_file": store.get_setting("custom_file", ""),
             "commit_count": int(store.get_setting("commit_count", str(config.DEFAULT_COMMIT_COUNT))),
+            "model_source": store.get_setting("model_source", "builtin"),
+            "server_url": store.get_setting("server_url", local_server.DEFAULT_URL),
+            "server_model": store.get_setting("server_model", ""),
             "last_project": int(store.get_setting("last_project", "0") or 0),
         },
         "languages": config.LANGUAGES,
         "presets": {k: {"label": p.label, "size_gb": p.size_gb} for k, p in config.MODEL_PRESETS.items()},
-        "model": {"label": preset.label, "filename": preset.filename, "downloaded": downloaded,
+        "model": {"label": preset.label, "filename": preset.filename, "downloaded": downloaded or model_available(),
                   "size_gb": round(model_manager.model_path(preset).stat().st_size / 1e9, 2)
                   if model_manager.is_downloaded(preset) else preset.size_gb},
         "editor": {"ready": vendor.monaco_ready(), "job": editor_job and editor_job["id"],
@@ -313,6 +331,15 @@ async def update_settings(request: Request) -> Response:
     for key in ("custom_repo", "custom_file"):
         if key in data and isinstance(data[key], str):
             store.set_setting(key, data[key].strip())
+    if data.get("model_source") in ("builtin", "server"):
+        store.set_setting("model_source", data["model_source"])
+    if isinstance(data.get("server_url"), str):
+        try:
+            store.set_setting("server_url", local_server.normalize_url(data["server_url"]))
+        except ModelError as e:
+            return fail(str(e))
+    if isinstance(data.get("server_model"), str):
+        store.set_setting("server_model", data["server_model"].strip())
     if "commit_count" in data and isinstance(data["commit_count"], int) and 1 <= data["commit_count"] <= 5000:
         store.set_setting("commit_count", str(data["commit_count"]))
     if "last_project" in data and isinstance(data["last_project"], int):
@@ -328,6 +355,16 @@ async def job_status(request: Request) -> Response:
 
 
 # =========================================================================== routes: model & editor
+async def server_models(request: Request) -> Response:
+    """Connection check for a local model server: the models it offers."""
+    url = request.query_params.get("url") or store.get_setting("server_url", local_server.DEFAULT_URL)
+    try:
+        models = await asyncio.to_thread(local_server.list_models, url)
+    except ModelError as e:
+        return fail(str(e))
+    return ok({"url": local_server.normalize_url(url), "models": models})
+
+
 async def download_model(request: Request) -> Response:
     preset = current_preset()
     job = JOBS.start("model", "model", lambda progress: str(model_manager.ensure_model(preset, progress)))
@@ -504,11 +541,10 @@ def _answer_stream(c: dict, project: dict, question: str, focus: dict | None) ->
     started, text, used = time.monotonic(), "", []
     try:
         yield _sse({"type": "status", "stage": "loading"})
-        preset = current_preset()
-        if not model_manager.is_downloaded(preset) and not os.environ.get("GITLORE_FAKE_LLM"):
+        if not model_available():
             raise ModelError("The model isn't downloaded yet. Download it in Settings first.")
         with MODELS.lock:
-            llm = MODELS.get(preset)
+            llm = current_llm()
             yield _sse({"type": "status", "stage": "searching"})
             focus_commit = None
             if focus and focus.get("commit"):
@@ -637,7 +673,7 @@ def _brief_job(progress, project_id: int, kind: str, since: str | None) -> dict:
     project = store.get_project(project_id)
     path = project["path"]
     language = store.get_setting("language", config.DEFAULT_LANGUAGE)
-    llm = LockedLlm(MODELS.get(current_preset())) if model_available() else None
+    llm = LockedLlm(current_llm()) if model_available() else None
     report = lambda done, total, label="": progress(done, total, label)  # noqa: E731
     if kind == "history":
         result = narratives.repository_history(path, llm, language, report)
@@ -780,6 +816,7 @@ def create_app(setup: bool = True, extra_hosts: tuple[str, ...] = ()) -> Starlet
         Route("/api/settings", update_settings, methods=["POST"]),
         Route("/api/jobs/{job_id}", job_status),
         Route("/api/model/download", download_model, methods=["POST"]),
+        Route("/api/model/server-models", server_models),
         Route("/api/model", delete_model, methods=["DELETE"]),
         Route("/api/editor/download", download_editor, methods=["POST"]),
         Route("/api/projects", add_project, methods=["POST"]),
