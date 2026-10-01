@@ -61,6 +61,7 @@ def understand(repo_path: str, question: str) -> dict:
                 break
         elif len(w) > 3 and any(_fold(PurePosixPath(p).stem) == w for p in paths):
             found["path"] = w  # a bare module name like "storage" or "auth"
+            found["stem"] = True
             found["weak"] = True
             break
 
@@ -84,6 +85,8 @@ def understand(repo_path: str, question: str) -> dict:
 def _filtered(repo_path: str, found: dict) -> list[str]:
     """Hashes matching the filters, newest first. If all together match nothing, each alone (most precise first)."""
     keys = [k for k in ("release", "author", "path", "type") if k in found]
+    if found.get("stem") and {"release", "author"} & found.keys():
+        keys.remove("path")  # "the main changes in v2.0" is about the release, not main.py
     for group in [keys, *([k] for k in keys)] if len(keys) > 1 else [keys] if keys else []:
         query = " ".join(f'{k}:"{found[k]}"' for k in group)
         try:
@@ -124,6 +127,8 @@ def gather(repo_path: str, question: str, turns: Sequence[chat_engine.Turn] = ()
     previous = [c for p in previous for c in _commit(repo_path, p["hash"])] if follow_up else []
     found = understand(repo_path, question) or (understand(repo_path, query) if follow_up else {})
     filtered = [c for h in _filtered(repo_path, found) for c in _commit(repo_path, h)]
+    if found.get("release"):  # say which release they belong to, or the model "can't find" v1.1.1
+        filtered = [{**c, "release": found["release"]} for c in filtered]
     hits = vector_store.search(repo_path, query, top_k=SEMANTIC_TOP_K)
     if found.get("author"):  # "what did Priya do?": other people's commits are noise
         hits = [c for c in hits if c["author"] == found["author"]]

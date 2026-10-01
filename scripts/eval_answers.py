@@ -2,6 +2,8 @@
 
     python scripts/eval_answers.py            # all cases
     python scripts/eval_answers.py jwt csv    # only cases whose name contains one of the words
+    python scripts/eval_answers.py --hard     # plus 8 harder questions
+    python scripts/eval_answers.py --hard --server http://localhost:11434 --model qwen3:8b   # a local server's model
 
 Each case checks: the right commits reached the prompt (retrieval), the answer cites them (grounding),
 no made-up hashes (hallucination), expected words appear, and no repeated sentences.
@@ -34,8 +36,20 @@ CASES = [
     ("dashboard", "Why was the web dashboard removed and brought back?", [], [["f860c76", "3fe74a4"]], ["paginat", "slow"]),
     ("sqlite", "Why did storage move from JSON to SQLite?", [], [["62916c8"]], ["json"]),
     ("follow-up", "Who did that?", [("Why was the CSV export reverted?", None)], [["9758330", "11fef00"]], ["sara"]),
-    ("follow-up-2", "And when was it added back?", [("Why was the CSV export reverted?", None)], [["74a2d62"]], ["2026", "lucía", "lucia", "again"]),
+    ("follow-up-2", "And when was it added back?", [("Why was the CSV export reverted?", None)], [["74a2d62"]], ["2026", "lucía", "lucia", "again", "added back"]),
     ("unknown", "Why did we add Kubernetes support?", [], [], ["no ", "not ", "doesn't", "don't", "isn't"]),
+]
+
+# Harder: two-part questions, exact facts buried in commit bodies, ranges, and a second trap (--hard).
+HARD = [
+    ("h-owner", "Who owns the auth code now, and why did ownership change?", [], [["5abf3be"]], ["another team", "moving"]),
+    ("h-password", "Why was password hashing changed, and what did it replace?", [], [["42a66f5"]], ["sha-256", "sha256"]),
+    ("h-cache", "Why does the API keep the task list in memory, and how much faster did it get?", [], [["69277a4"]], ["5x", "five times", "5 times"]),
+    ("h-packages", "Why was the code split into packages, and what rule do the packages follow?", [], [["05938c8"]], ["one-way", "never each other", "not each other"]),
+    ("h-ratelimit", "What attack led to rate-limiting logins, and what exactly is the limit?", [], [["457216d"]], ["15 minutes", "15-minute"]),
+    ("h-range", "What were the main changes between v1.3.0 and v2.0.0?", [], [["3fe74a4", "99f0e6d", "457216d", "f860c76", "521bd67"]], ["dashboard", "paginat", "rate"]),
+    ("h-chain", "The web dashboard was added, removed and added again. Explain each step and why.", [], [["521bd67", "f860c76"], ["3fe74a4"]], ["paginat"]),
+    ("h-trap", "Why did we migrate from SQLite to PostgreSQL?", [], [], ["no ", "not ", "doesn't", "don't", "isn't", "never"]),
 ]
 
 _CITE = re.compile(r"\[([0-9a-f]{7,40})\]")
@@ -80,15 +94,23 @@ def main() -> None:
     if vector_store.count(path) == 0:
         vector_store.index_commits(path, get_commits(path, 500))
     known = set(insights._load(path)["by_hash"])
-    llm = model_manager.load_llm(config.MODEL_PRESETS[config.DEFAULT_PRESET])
-    picked = [c for c in CASES if len(sys.argv) < 2 or any(w in c[0] for w in sys.argv[1:])]
+    args = sys.argv[1:]
+    opt = lambda name: args[args.index(name) + 1] if name in args else None  # noqa: E731
+    if opt("--server"):  # e.g. --server http://localhost:11434 --model qwen3:8b
+        from src import local_server
+        llm = local_server.LocalServerLlm(opt("--server"), opt("--model"))
+    else:
+        llm = model_manager.load_llm(config.MODEL_PRESETS[config.DEFAULT_PRESET])
+    cases = CASES + HARD if "--hard" in args else HARD if "--only-hard" in args else CASES
+    words = [a for i, a in enumerate(args) if not a.startswith("-") and (i == 0 or args[i - 1] not in ("--server", "--model"))]
+    picked = [c for c in cases if not words or any(w in c[0] for w in words)]
     results = [run_case(llm, path, known, c) for c in picked]
     for r in results:
         flags = [k for k in ("retrieved", "grounded", "worded") if not r[k]]
         flags += [f"fake {r['fake']}"] if r["fake"] else []
         flags += [f"{r['repeats']} repeats"] if r["repeats"] else []
         print(f"{'PASS' if r['ok'] else 'FAIL'} {r['name']:<14} {r['seconds']:>5}s {r['prompt_tokens']:>5} tok  {', '.join(flags)}")
-        if "-v" in sys.argv or not r["ok"]:
+        if "-v" in args or not r["ok"]:
             print("     " + r["answer"].replace("\n", "\n     ")[:900])
     print(f"\n{sum(r['ok'] for r in results)}/{len(results)} passed, "
           f"{sum(r['seconds'] for r in results) / len(results):.1f}s average")

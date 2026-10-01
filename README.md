@@ -110,6 +110,31 @@ follow-ups, and a trap question the history can't answer.
 | Before (meaning search only) | **8 / 15** | Missed filter questions; follow-ups failed |
 | v0.3.1 | **14 / 15** | The one miss: two commits named almost the same ("Add CSV export" vs "… again") get mixed up |
 
+With `--hard`, 8 harder questions are added: two-part questions ("why, and what did it replace?"), exact facts
+buried in commit messages ("how much faster?", "what exactly is the limit?"), a release-to-release comparison,
+a three-step story (added → reverted → added back) and a second trap.
+
+### With a bigger model
+
+GitLore can use any model you already run locally (see *Bring your own model* above). Same 23 questions, same
+retrieval and prompts, only the model changes:
+
+| Model | Runs on | Standard (15) | Harder (8) | Total | Avg. answer |
+|---|---|---|---|---|---|
+| Qwen3-1.7B (built in) | laptop CPU, i5-11400H | 14 | 6 | **20 / 23** | 18 s |
+| Qwen3-8B Q4_K_M via Ollama | GPU, partly CPU | 14 | 7 | **21 / 23** | 30 s* |
+
+The 8B is better at the details: it gave the exact figures from the commit messages ("5× faster", "5 failures
+per 15 minutes") and the full ownership story where the 1.7B answered vaguely, and it didn't mix up the two CSV
+commits. Its misses: one answer without a citation, and one long story cut off before its last step. The
+built-in model stays the default because it is small, needs no GPU and is already accurate on everyday questions;
+a bigger local model is worth it for detailed "why" digging.
+
+\*Measured with Ollama's default 40k-token context, which pushed most of the 8B onto the CPU. With a smaller
+context (`OLLAMA_CONTEXT_LENGTH=8192`; GitLore needs about 2,500 tokens) it fits in GPU memory and answers much faster.
+
+Testing your own model: `python scripts/eval_answers.py --hard --server http://localhost:11434 --model <name>`.
+
 Real answers, recorded by `scripts/capture_media.py` (full set in [docs/media/answers.md](docs/media/answers.md)):
 
 > **Why did we switch login to JWT?**

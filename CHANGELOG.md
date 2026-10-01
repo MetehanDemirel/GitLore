@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- `scripts/eval_answers.py --hard` adds 8 harder questions; `--server`/`--model` test any local model server.
+  README: results for Qwen3-8B via Ollama (21/23) next to the built-in Qwen3-1.7B (20/23).
 - **Tag commits in the chat.** The tag button in a commit's header adds it to the chat box as a chip
   ("Commit 330c2a8"); tag up to five, then ask about them together. Tagged commits are read first and stay
   shown on the question.
@@ -10,6 +12,10 @@
   LM Studio, llama.cpp's server or anything else with an OpenAI-compatible API (for example
   `http://localhost:11434`), pick one of its models, and answers and stories come from it. Only addresses on
   this computer are accepted, so code still never leaves the machine.
+
+### Fixed
+- Questions about a release ("what changed in v1.1.1?", "between v1.3.0 and v2.0.0") now work: commits are
+  labeled with their release, and a common word like "main" is no longer mistaken for a file name.
 
 ## [0.3.1] — 2026-10-01
 

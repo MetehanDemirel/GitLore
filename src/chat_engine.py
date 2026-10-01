@@ -51,7 +51,10 @@ def retrieval_query(question: str, history: Sequence[Turn] = ()) -> str:
 def candidate_commits(hits: Sequence[Commit], previous: Sequence[Commit], follow_up: bool) -> list[Commit]:
     """Follow-ups keep the commits the previous answer was based on first, so the conversation stays on topic."""
     ranked = [*previous, *hits] if follow_up else list(hits)
-    return list({c["hash"]: c for c in ranked}.values())
+    first: dict[str, Commit] = {}
+    for c in ranked:
+        first.setdefault(c["hash"], c)  # the earliest copy wins: it may carry extra labels (release)
+    return list(first.values())
 
 
 def format_commit(c: Commit, include_diff: bool = True) -> str:
@@ -62,6 +65,8 @@ def format_commit(c: Commit, include_diff: bool = True) -> str:
         f"Date: {c['date'][:10]}",
         f"Message: {c['message'].strip()}",
     ]
+    if c.get("release"):
+        lines.append(f"Release: part of {c['release']}")
     if c["files_changed"]:
         lines.append(f"Files: {', '.join(c['files_changed'])}")
     if include_diff and c["diff_summary"]:
