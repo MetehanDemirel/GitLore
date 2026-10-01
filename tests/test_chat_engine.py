@@ -32,7 +32,7 @@ def total_tokens(llm, messages) -> int:
     return sum(len(llm.tokenize(m["content"].encode())) for m in messages)
 
 
-def test_commits_are_included_in_rank_order_with_citation_format():
+def test_commits_are_included_in_rank_order_with_labeled_fields():
     llm = FakeLlm()
     commits = [make_commit(1), make_commit(2)]
     messages, used = chat_engine.build_messages(llm, "Why?", commits)
@@ -41,8 +41,8 @@ def test_commits_are_included_in_rank_order_with_citation_format():
     assert messages[0] == {"role": "system", "content": chat_engine.SYSTEM_PROMPT}
     user = messages[-1]["content"]
     assert user.index("[0000001]") < user.index("[0000002]")
-    assert "Dev 1, 2026-09-30" in user and "Files: f1.py" in user
-    assert user.rstrip().endswith("Question: Why?")
+    assert "Author: Dev 1\nDate: 2026-09-30" in user and "Files: f1.py" in user
+    assert "Question: Why?\n(Answer this exact question" in user
 
 
 def test_prompt_never_exceeds_context_budget():

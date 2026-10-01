@@ -24,7 +24,8 @@ from starlette.responses import FileResponse, JSONResponse, Response, StreamingR
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from src import chat_engine, config, demo, git_ops, insights, model_manager, narratives, online, store, vector_store, vendor
+from src import (chat_engine, config, demo, git_ops, insights, model_manager, narratives, online, retrieval, store,
+                 vector_store, vendor)
 from src.config import ModelPreset
 from src.git_ops import GitOpError
 from src.git_parser import RepoError, get_commits, open_repo
@@ -509,20 +510,13 @@ def _answer_stream(c: dict, project: dict, question: str, focus: dict | None) ->
         with MODELS.lock:
             llm = MODELS.get(preset)
             yield _sse({"type": "status", "stage": "searching"})
-            follow_up = chat_engine.is_follow_up(question, turns)
-            hits = vector_store.search(project["path"], chat_engine.retrieval_query(question, turns))
-            focused = []
+            focus_commit = None
             if focus and focus.get("commit"):
                 try:
-                    focused = get_commits(project["path"], 1, rev=git_ops.commit_detail(project["path"], focus["commit"])["hash"])
+                    focus_commit = git_ops.commit_detail(project["path"], focus["commit"])["hash"]
                 except (RepoError, GitOpError):
-                    focused = []
-            candidates = chat_engine.candidate_commits([*focused, *hits], previous, follow_up)
-            # Dig for *why*: the commits a revert undid, and other commits about the same issue.
-            related = []
-            for h in insights.related(project["path"], [x["hash"] for x in candidates[:3]]):
-                related += get_commits(project["path"], 1, rev=h)
-            candidates = chat_engine.candidate_commits([*candidates[:3], *related, *candidates[3:]], [], False)
+                    pass
+            candidates = retrieval.gather(project["path"], question, turns, previous, focus_commit)
             notes = _discussion_notes(project, candidates[:1])
             messages, used_full = chat_engine.build_messages(llm, question, candidates, turns, language, focus, notes)
             used = [_commit_summary(x) for x in used_full]
@@ -760,6 +754,16 @@ def _http_error(request: Request, exc: HTTPException) -> Response:
     return fail(exc.detail, exc.status_code)
 
 
+class _RevalidatedStatic(StaticFiles):
+    """The UI's own files: the browser checks for a newer copy each time (a cheap 304 when unchanged), so
+    an upgraded GitLore never runs yesterday's JavaScript from the cache."""
+
+    def file_response(self, *args, **kwargs) -> Response:
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 def create_app(setup: bool = True, extra_hosts: tuple[str, ...] = ()) -> Starlette:
     """Build the app. `setup` creates the demo project and fetches the editor; tests add their host name."""
     if setup:
@@ -805,7 +809,7 @@ def create_app(setup: bool = True, extra_hosts: tuple[str, ...] = ()) -> Starlet
         Route("/api/projects/{pid:int}/online/info", online_info),
         Route("/api/projects/{pid:int}/online/releases", online_releases),
         Route("/api/projects/{pid:int}/online/discussions/{sha}", online_discussions),
-        Mount("/static", StaticFiles(directory=config.WEB_DIR), name="static"),
+        Mount("/static", _RevalidatedStatic(directory=config.WEB_DIR), name="static"),
         Mount("/monaco", StaticFiles(directory=config.VENDOR_DIR, check_dir=False), name="monaco"),
     ]
     middleware = [Middleware(TrustedHostMiddleware, allowed_hosts=["127.0.0.1", "localhost", *extra_hosts])]

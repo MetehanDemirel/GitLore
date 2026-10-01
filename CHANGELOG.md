@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Improved
+- **More accurate answers with the same model.** Questions are read for people, files, releases, kinds of
+  change and "latest", and the matching commits are found directly instead of by meaning alone; repeated
+  look-alike commits are skipped; follow-ups ("Who did that?", "When was it added back?") stay on topic;
+  the key instructions are repeated after the question. On a 15-question check against the demo
+  (`scripts/eval_answers.py`) correct, cited answers went from 8 to 14.
+
+### Fixed
+- Deleting a chat no longer freezes the assistant panel; deleting during an answer stops it.
+- Follow-up questions no longer fail when the previous answer used commits.
+- After an update, the browser loads the new interface instead of a cached old copy.
+
 ## [0.3.0] — 2026-09-30
 
 GitLore now explains **why** a project became what it is, helps people who are new or coming back catch

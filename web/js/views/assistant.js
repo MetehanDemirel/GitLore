@@ -105,6 +105,19 @@ export function Assistant() {
   const newChat = () => { abort.current?.abort(); setChatId(null); setMessages([]); setListOpen(false); textarea.current?.focus(); };
   const current = chats.find((c) => c.id === chatId);
 
+  const deleteChat = async () => {
+    const id = chatId;
+    setDialog(null);             // close first: the dialog reads the chat that is about to disappear
+    abort.current?.abort();      // an answer still streaming into this chat
+    try {
+      await api.del(`/api/chats/${id}`);
+    } catch (e) {
+      app.toast(e.message, true);
+    }
+    const list = await loadChats().catch(() => []);
+    setChatId(list[0]?.id ?? null);
+  };
+
   const onAnswerClick = (e) => {
     const cite = e.target.closest("[data-hash]");
     if (cite) app.openCommit(cite.dataset.hash);
@@ -163,10 +176,9 @@ export function Assistant() {
     ${dialog === "rename" && html`<${PromptDialog} title=${t("assistant.renameChat")} label=${t("assistant.chatTitle")}
       value=${current.title} action=${t("common.save")} onClose=${() => setDialog(null)}
       onSubmit=${async (title) => { await api.patch(`/api/chats/${chatId}`, { title }); await loadChats(); }} />`}
-    ${dialog === "delete" && html`<${ConfirmDialog} title=${t("confirm.deleteChat.title")}
+    ${dialog === "delete" && current && html`<${ConfirmDialog} title=${t("confirm.deleteChat.title")}
       body=${t("confirm.deleteChat.body", { title: current.title })} action=${t("confirm.deleteChat.action")}
-      onClose=${() => setDialog(null)}
-      onConfirm=${async () => { await api.del(`/api/chats/${chatId}`); const list = await loadChats(); setChatId(list[0]?.id ?? null); }} />`}
+      onClose=${() => setDialog(null)} onConfirm=${deleteChat} />`}
   </aside>`;
 }
 

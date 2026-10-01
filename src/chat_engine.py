@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator, Sequence
 from typing import TYPE_CHECKING
 
@@ -32,11 +33,14 @@ _FOCUS_MAX_CHARS = 1200          # selected code carried into the prompt
 _TEMPLATE_SLACK_TOKENS = 64      # chat-template markup around each message
 _HISTORY_ANSWER_TOKENS = 200     # how much of the previous answer to carry into a follow-up
 _FOLLOW_UP_MAX_WORDS = 5         # short questions ("and who did that?") inherit the previous question
+_FOLLOW_UP_LONG_WORDS = 12       # ... and slightly longer ones that point back ("when was it added back?")
+_REFERS_BACK = re.compile(r"\b(it|that|this|these|those|they|them|he|she|his|her|their|again|back|also|and)\b", re.I)
 
 
 def is_follow_up(question: str, history: Sequence[Turn] = ()) -> bool:
-    """Short questions after a previous turn ("and who did that?") refer back to it."""
-    return bool(history) and len(question.split()) <= _FOLLOW_UP_MAX_WORDS
+    """Questions after a previous turn that are short, or point back to it ("when was it added back?")."""
+    n = len(question.split())
+    return bool(history) and (n <= _FOLLOW_UP_MAX_WORDS or (n <= _FOLLOW_UP_LONG_WORDS and bool(_REFERS_BACK.search(question))))
 
 
 def retrieval_query(question: str, history: Sequence[Turn] = ()) -> str:
@@ -51,9 +55,12 @@ def candidate_commits(hits: Sequence[Commit], previous: Sequence[Commit], follow
 
 
 def format_commit(c: Commit, include_diff: bool = True) -> str:
+    # Labeled fields: a small model reads "Author: Sara" reliably; a bare "[hash] Sara, date" header it overlooks.
     lines = [
-        f"[{c['short_hash']}] {c['author']}, {c['date'][:10]}",
-        f"Message: {c['message']}",
+        f"Commit [{c['short_hash']}]",
+        f"Author: {c['author']}",
+        f"Date: {c['date'][:10]}",
+        f"Message: {c['message'].strip()}",
     ]
     if c["files_changed"]:
         lines.append(f"Files: {', '.join(c['files_changed'])}")
@@ -111,7 +118,11 @@ def build_messages(
     # Small models follow the instruction closest to the end best, so the answer language is repeated here.
     reminder = f"\n(Answer in {ANSWER_LANGUAGES[language]}.)" if language != "en" and language in ANSWER_LANGUAGES else ""
     notes_block = f"\n\nDiscussion behind these changes (from GitHub):\n{notes[:1200]}" if notes else ""
-    question_block = f"{notes_block}{focus_block}\n\nQuestion: {question.strip()}{reminder}"
+    # Small models follow the instructions nearest the end, so the essentials are restated after the question.
+    label = f"Follow-up question (about: {history[-1][0].strip()})" if is_follow_up(question, history) else "Question"
+    rules = ("\n(Answer this exact question, not an earlier one. Use only the commits above and cite each claim "
+             "with its hash in square brackets.)")
+    question_block = f"{notes_block}{focus_block}\n\n{label}: {question.strip()}{rules}{reminder}"
     budget = (
         config.MAX_PROMPT_TOKENS
         - _TEMPLATE_SLACK_TOKENS * (len(messages) + 1)
@@ -131,8 +142,10 @@ def build_messages(
                 budget -= cost
                 break
 
+    # Most relevant first. (Tried oldest-first: the eval got worse, the model then answers about whatever
+    # sits last, e.g. "who reverted it?" described the later re-add.)
     context = "\n\n".join(blocks) if blocks else "(No relevant commits were found.)"
-    messages.append({"role": "user", "content": f"Commits:\n\n{context}{question_block}"})
+    messages.append({"role": "user", "content": f"Commits (most relevant first):\n\n{context}{question_block}"})
     return messages, used
 
 
